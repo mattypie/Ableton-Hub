@@ -25,6 +25,8 @@ A comprehensive cross-platform desktop application for organizing, managing, and
 
 ## 🏗️ Architecture
 
+> **Note**: The diagram below uses Mermaid, which renders on GitHub's website but not in the mobile app. If viewing on mobile, expand the "View Diagram (Mobile)" section below for an image version.
+
 ```mermaid
 graph TB
     subgraph ui["UI Layer - PyQt6"]
@@ -102,6 +104,60 @@ graph TB
     MainWindow --> Config
     ProjectGrid --> Cache
 ```
+
+<details>
+<summary><strong>View Diagram (Mobile)</strong></summary>
+
+If the Mermaid diagram above doesn't render (e.g., on GitHub mobile app), view the architecture diagram below:
+
+<div align="center">
+  <img src="resources/images/system-diagram.png" alt="Ableton Hub System Architecture Diagram" width="100%"/>
+</div>
+
+</details>
+
+### Architecture Overview
+
+The application follows a layered architecture:
+
+**UI Layer (PyQt6)**
+- Main Window orchestrates all UI components
+- Sidebar Navigation provides access to locations, collections, and Live installations
+- Project Grid/List View displays projects with multiple view modes
+- Search & Filter Bar enables full-text search and advanced filtering
+- Collection View manages static and smart collections
+- Health Dashboard visualizes project health metrics
+
+**Service Layer**
+- Project Scanner discovers and indexes `.als` files
+- File System Watcher monitors for real-time changes
+- ALS Parser extracts metadata from project files
+- Live Version Detector finds installed Ableton Live versions
+- Live Launcher opens projects with specific Live versions
+- Link Network Scanner discovers Ableton Link devices
+- Export Tracker identifies and links exported audio files
+- Smart Collections creates rule-based dynamic collections
+- Duplicate Detector finds duplicate projects using hash comparison
+- Health Calculator computes project health metrics
+- Audio Player provides in-app playback of exported audio
+- Archive Service handles project backup and archiving
+
+**Data Storage**
+- SQLite Database (with FTS5) stores all project metadata and enables full-text search
+- Configuration stores user preferences and settings
+- Thumbnail Cache stores generated waveform previews
+
+**External Resources**
+- `.als` Project Files are read-only parsed for metadata
+- Exported Audio Files are linked to projects and can be played
+- Ableton Live Installations are detected and used for launching projects
+- Ableton Link Network is monitored for device discovery
+
+**Data Flow**
+- UI components interact with services, which read/write to the database
+- Scanner and Watcher monitor project files and update the database
+- Services like Export Tracker and Archive Service interact with both files and database
+- All user preferences and window state are persisted in configuration
 
 ## 🎵 Features
 
