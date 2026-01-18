@@ -41,8 +41,32 @@ venv/
 .cursor/
 .cursorrules
 
-# PyInstaller
+# PyInstaller / Build artifacts
 *.spec
+# Build directories (already covered by build/ and dist/ above, but being explicit)
+build/
+dist/
+# PyInstaller cache and temporary files
+*.manifest
+*.toc
+*.pkg
+*.pyz
+*.pyc.toc
+# Executable files (though they're usually in dist/)
+*.exe
+*.app
+# PyInstaller build warnings and analysis
+warn-*.txt
+xref-*.html
+Analysis-*.toc
+COLLECT-*.toc
+EXE-*.toc
+PKG-*.toc
+PYZ-*.toc
+# Generated icons and resources
+generated-*.ico
+# Local Python cache in build directory
+localpycs/
 
 # Database
 *.db

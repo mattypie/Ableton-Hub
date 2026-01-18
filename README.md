@@ -27,41 +27,41 @@ A comprehensive cross-platform desktop application for organizing, managing, and
 
 ```mermaid
 graph TB
-    subgraph ui[UI Layer - PyQt6]
-        MainWindow[Main Window]
-        Sidebar[Sidebar Navigation]
-        ProjectGrid[Project Grid/List View]
-        SearchBar[Search & Filter Bar]
-        CollectionView[Collection View]
-        HealthDashboard[Health Dashboard]
+    subgraph ui["UI Layer - PyQt6"]
+        MainWindow["Main Window"]
+        Sidebar["Sidebar Navigation"]
+        ProjectGrid["Project Grid/List View"]
+        SearchBar["Search & Filter Bar"]
+        CollectionView["Collection View"]
+        HealthDashboard["Health Dashboard"]
     end
     
-    subgraph services[Service Layer]
-        Scanner[Project Scanner]
-        Watcher[File System Watcher]
-        ALSParser[ALS Parser]
-        LiveDetector[Live Version Detector]
-        LiveLauncher[Live Launcher]
-        LinkScanner[Link Network Scanner]
-        ExportTracker[Export Tracker]
-        SmartCollections[Smart Collections]
-        DuplicateDetector[Duplicate Detector]
-        HealthCalculator[Health Calculator]
-        AudioPlayer[Audio Player]
-        ArchiveService[Archive Service]
+    subgraph services["Service Layer"]
+        Scanner["Project Scanner"]
+        Watcher["File System Watcher"]
+        ALSParser["ALS Parser"]
+        LiveDetector["Live Version Detector"]
+        LiveLauncher["Live Launcher"]
+        LinkScanner["Link Network Scanner"]
+        ExportTracker["Export Tracker"]
+        SmartCollections["Smart Collections"]
+        DuplicateDetector["Duplicate Detector"]
+        HealthCalculator["Health Calculator"]
+        AudioPlayer["Audio Player"]
+        ArchiveService["Archive Service"]
     end
     
-    subgraph storage[Data Storage]
-        SQLite[(SQLite Database<br/>with FTS5)]
-        Config[Configuration]
-        Cache[Thumbnail Cache]
+    subgraph storage["Data Storage"]
+        SQLite[("SQLite Database with FTS5")]
+        Config["Configuration"]
+        Cache["Thumbnail Cache"]
     end
     
-    subgraph external[External Resources]
-        ProjectFiles[.als Project Files]
-        ExportedAudio[Exported Audio Files]
-        LiveInstallations[Ableton Live Installations]
-        LinkNetwork[Ableton Link Network]
+    subgraph external["External Resources"]
+        ProjectFiles[".als Project Files"]
+        ExportedAudio["Exported Audio Files"]
+        LiveInstallations["Ableton Live Installations"]
+        LinkNetwork["Ableton Link Network"]
     end
     
     MainWindow --> Sidebar
@@ -321,12 +321,27 @@ graph TB
    
    > **Note**: The executable will include all dependencies, so the first build may take several minutes.
 
-### Using pip (when published)
+### Using pip (Recommended)
 
+**Option 1: Install from GitHub (Current)**
+```bash
+pip install git+https://github.com/yourusername/ableton-hub.git
+ableton-hub
+```
+
+**Option 2: Install from PyPI (When Published)**
 ```bash
 pip install ableton-hub
 ableton-hub
 ```
+
+Both methods will:
+- ✅ Automatically install all dependencies (PyQt6, SQLAlchemy, ML libraries, etc.)
+- ✅ Create the `ableton-hub` command in your PATH
+- ✅ Work on Windows, macOS, and Linux
+- ✅ Allow easy updates: `pip install --upgrade ableton-hub`
+
+> **Note**: The pip method requires Python 3.11+ to be installed. For users without Python, use the standalone executable (see "From Source" → Option C).
 
 ## 🎯 Quick Start
 
