@@ -4,7 +4,7 @@
 
 # Ableton Hub
 
-A comprehensive cross-platform desktop application for organizing, managing, and discovering Ableton Live projects across multiple locations. Built with Python and PyQt6, Ableton Hub provides powerful tools for music producers to maintain their project libraries, create collections, track exports, and seamlessly integrate with their Ableton Live workflow.
+Your Ableton projects, finally in tune. Organize your entire library, discover lost beats, and keep your Live workflow flowing—all from one place.
 
 <div align="center">
   <img src="resources/images/ableton-hub-screenshot.png" alt="Ableton Hub Logo" />
