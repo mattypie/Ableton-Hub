@@ -1,0 +1,209 @@
+"""Cross-platform path utilities for Ableton Hub."""
+
+import os
+import sys
+from pathlib import Path
+from typing import List
+
+
+def get_app_data_dir() -> Path:
+    """Get the application data directory for storing config and database.
+    
+    Returns:
+        Path to the app data directory (created if it doesn't exist).
+    """
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    
+    app_dir = base / "AbletonHub"
+    app_dir.mkdir(parents=True, exist_ok=True)
+    return app_dir
+
+
+def get_database_path() -> Path:
+    """Get the path to the SQLite database file.
+    
+    Returns:
+        Path to the database file.
+    """
+    return get_app_data_dir() / "ableton_hub.db"
+
+
+def get_config_path() -> Path:
+    """Get the path to the configuration JSON file.
+    
+    Returns:
+        Path to the config file.
+    """
+    return get_app_data_dir() / "config.json"
+
+
+def get_thumbnail_cache_dir() -> Path:
+    """Get the path to the thumbnail cache directory.
+    
+    Returns:
+        Path to the thumbnail cache directory (created if it doesn't exist).
+    """
+    cache_dir = get_app_data_dir() / "thumbnails"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir
+
+
+def get_default_locations() -> List[Path]:
+    """Get default Ableton project folder locations based on the OS.
+    
+    Returns:
+        List of default paths that may contain Ableton projects.
+    """
+    locations = []
+    
+    if sys.platform == "win32":
+        # Windows default locations
+        user_profile = Path(os.environ.get("USERPROFILE", Path.home()))
+        appdata = Path(os.environ.get("APPDATA", user_profile / "AppData" / "Roaming"))
+        
+        locations.extend([
+            user_profile / "Documents" / "Ableton",
+            user_profile / "Music" / "Ableton",
+            appdata / "Ableton",
+            user_profile / "Documents" / "Ableton" / "User Library",
+        ])
+    elif sys.platform == "darwin":
+        # macOS default locations
+        home = Path.home()
+        locations.extend([
+            home / "Music" / "Ableton",
+            home / "Documents" / "Ableton",
+            home / "Library" / "Application Support" / "Ableton",
+            home / "Music" / "Ableton" / "User Library",
+        ])
+    else:
+        # Linux (if Ableton runs via Wine or similar)
+        home = Path.home()
+        locations.extend([
+            home / "Music" / "Ableton",
+            home / "Documents" / "Ableton",
+        ])
+    
+    # Filter to only existing directories
+    return [loc for loc in locations if loc.exists()]
+
+
+def normalize_path(path: Path | str) -> str:
+    """Normalize a path for storage in the database.
+    
+    Converts to forward slashes for cross-platform compatibility.
+    
+    Args:
+        path: The path to normalize.
+        
+    Returns:
+        Normalized path string with forward slashes.
+    """
+    if isinstance(path, str):
+        path = Path(path)
+    return path.as_posix()
+
+
+def denormalize_path(path_str: str) -> Path:
+    """Convert a normalized path string back to a Path object.
+    
+    Args:
+        path_str: The normalized path string from the database.
+        
+    Returns:
+        Path object suitable for the current OS.
+    """
+    return Path(path_str)
+
+
+def get_relative_path(path: Path, base: Path) -> str | None:
+    """Get the relative path from a base directory.
+    
+    Args:
+        path: The full path.
+        base: The base directory.
+        
+    Returns:
+        Relative path string or None if path is not under base.
+    """
+    try:
+        return normalize_path(path.relative_to(base))
+    except ValueError:
+        return None
+
+
+def is_ableton_project(path: Path) -> bool:
+    """Check if a file is an Ableton Live project.
+    
+    Args:
+        path: Path to check.
+        
+    Returns:
+        True if the file is an Ableton project (.als file).
+    """
+    return path.is_file() and path.suffix.lower() == ".als"
+
+
+def get_resources_path() -> Path:
+    """Get the path to the resources directory.
+    
+    Returns:
+        Path to the resources directory.
+    """
+    # Get the path relative to this file
+    # Assuming structure: ableton_hub/src/utils/paths.py
+    # Resources are at: ableton_hub/resources/
+    current_file = Path(__file__)
+    # Go up from src/utils/paths.py to ableton_hub, then to resources
+    resources_path = current_file.parent.parent.parent / "resources"
+    return resources_path
+
+
+def get_project_folder(project_path: Path) -> Path:
+    """Get the parent folder of a project file.
+    
+    This is typically the folder containing the .als file and 
+    associated Samples, Backup folders, etc.
+    
+    Args:
+        project_path: Path to the .als file.
+        
+    Returns:
+        Path to the project folder.
+    """
+    return project_path.parent
+
+
+def find_export_folders(project_path: Path) -> List[Path]:
+    """Find common export folder locations relative to a project.
+    
+    Args:
+        project_path: Path to the .als file.
+        
+    Returns:
+        List of existing export folder paths.
+    """
+    project_folder = get_project_folder(project_path)
+    possible_exports = [
+        project_folder / "Exports",
+        project_folder / "Renders", 
+        project_folder / "Bounces",
+        project_folder / "Audio",
+        project_folder.parent / "Exports",
+        project_folder.parent / "Renders",
+    ]
+    
+    # Also check user's common export locations
+    home = Path.home()
+    possible_exports.extend([
+        home / "Music" / "Exports",
+        home / "Music" / "Renders",
+        home / "Documents" / "Exports",
+    ])
+    
+    return [folder for folder in possible_exports if folder.exists() and folder.is_dir()]
