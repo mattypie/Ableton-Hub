@@ -35,12 +35,11 @@ venv/
 
 # VS Code - allow settings but ignore other stuff
 .vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+
 
 # Cursor AI
 .cursor/
-!.cursorrules
+.cursorrules
 
 # PyInstaller
 *.spec
