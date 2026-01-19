@@ -226,11 +226,13 @@ If you prefer to download the source code and install manually:
 3. **Navigate to the extracted folder**:
    ```bash
    # macOS
-   cd ~/Downloads/ableton-hub-ableton_hub
+   cd ~/Downloads/Ableton-Hub-main
    
    # Windows (adjust path as needed)
-   cd C:\Users\YourName\Downloads\ableton-hub-ableton_hub
+   cd C:\Users\YourName\Downloads\Ableton-Hub-main
    ```
+   
+   **Note**: When you download the ZIP from GitHub, it extracts to a folder named `Ableton-Hub-main`. Make sure you're inside this folder before running the installation commands.
 
 4. **Set up a virtual environment** (recommended - keeps dependencies isolated):
    ```bash
@@ -446,6 +448,8 @@ The application follows a layered architecture:
    git clone https://github.com/yourusername/ableton-hub.git
    cd ableton-hub/ableton_hub
    ```
+   
+   **Note**: If downloading as ZIP instead of using git clone, extract the ZIP and navigate to the `Ableton-Hub-main` folder (the folder name when downloading from GitHub).
 
 2. **Create a virtual environment** (isolated Python environment):
    ```bash

@@ -93,12 +93,13 @@ If you prefer to download the source code and install manually:
    - Click the green "Code" button
    - Click "Download ZIP"
    - Extract the ZIP file (usually goes to your Downloads folder)
+   - **Note**: The extracted folder will be named `Ableton-Hub-main`
 
 2. **Open Command Prompt or PowerShell** and navigate to the extracted folder:
    ```bash
-   cd C:\Users\YourName\Downloads\ableton-hub-ableton_hub
+   cd C:\Users\YourName\Downloads\Ableton-Hub-main
    ```
-   (Adjust the path to match where you extracted the ZIP file)
+   (Adjust the path to match where you extracted the ZIP file. The folder name will be `Ableton-Hub-main` when you download the ZIP from GitHub.)
 
 3. **Set up a virtual environment** (recommended - keeps dependencies isolated):
    ```bash
@@ -109,7 +110,7 @@ If you prefer to download the source code and install manually:
    **Expected output:**
    You should see `(.venv)` appear at the beginning of your Command Prompt, like:
    ```
-   (.venv) C:\Users\YourName\Downloads\ableton-hub-ableton_hub>
+   (.venv) C:\Users\YourName\Downloads\Ableton-Hub-main>
    ```
 
    **Note**: In PowerShell, you might need to use:
@@ -233,10 +234,11 @@ pip install --upgrade git+https://github.com/yourusername/ableton-hub.git
 ```
 
 **If you used Method 2 (source installation):**
-1. Download the latest source code
-2. Navigate to the folder in Command Prompt/PowerShell
-3. Activate your virtual environment: `.venv\Scripts\activate.bat` (or `.ps1` in PowerShell)
-4. Update dependencies: `pip install --upgrade -r requirements.txt`
+1. Download the latest source code ZIP from GitHub
+2. Extract it (creates `Ableton-Hub-main` folder)
+3. Navigate to the folder in Command Prompt/PowerShell: `cd C:\Users\YourName\Downloads\Ableton-Hub-main`
+4. Activate your virtual environment: `.venv\Scripts\activate.bat` (or `.ps1` in PowerShell)
+5. Update dependencies: `pip install --upgrade -r requirements.txt`
 
 ## Getting Help
 

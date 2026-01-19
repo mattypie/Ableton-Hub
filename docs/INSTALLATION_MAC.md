@@ -83,12 +83,13 @@ If you prefer to download the source code and install manually:
    - Click the green "Code" button
    - Click "Download ZIP"
    - Extract the ZIP file (usually goes to your Downloads folder)
+   - **Note**: The extracted folder will be named `Ableton-Hub-main`
 
 2. **Open Terminal** and navigate to the extracted folder:
    ```bash
-   cd ~/Downloads/ableton-hub-ableton_hub
+   cd ~/Downloads/Ableton-Hub-main
    ```
-   (Adjust the path if you extracted it to a different location)
+   (Adjust the path if you extracted it to a different location. The folder name will be `Ableton-Hub-main` when you download the ZIP from GitHub.)
 
 3. **Set up a virtual environment** (recommended - keeps dependencies isolated):
    ```bash
@@ -99,7 +100,7 @@ If you prefer to download the source code and install manually:
    **Expected output:**
    You should see `(.venv)` appear at the beginning of your Terminal prompt, like:
    ```
-   (.venv) yourname@yourmac ableton-hub-ableton_hub %
+   (.venv) yourname@yourmac Ableton-Hub-main %
    ```
 
 4. **Install dependencies**:
@@ -191,10 +192,11 @@ pip install --upgrade git+https://github.com/yourusername/ableton-hub.git
 ```
 
 **If you used Method 2 (source installation):**
-1. Download the latest source code
-2. Navigate to the folder in Terminal
-3. Activate your virtual environment: `source .venv/bin/activate`
-4. Update dependencies: `pip install --upgrade -r requirements.txt`
+1. Download the latest source code ZIP from GitHub
+2. Extract it (creates `Ableton-Hub-main` folder)
+3. Navigate to the folder in Terminal: `cd ~/Downloads/Ableton-Hub-main`
+4. Activate your virtual environment: `source .venv/bin/activate`
+5. Update dependencies: `pip install --upgrade -r requirements.txt`
 
 ## Getting Help
 
