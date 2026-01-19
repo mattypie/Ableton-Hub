@@ -494,44 +494,44 @@ The application version uses a **single source of truth** pattern:
 ```
 ableton_hub/
 ├── src/
-│   ├── main.py              # Application entry point
-│   ├── app.py               # Main QApplication setup
-│   ├── config.py            # Configuration manager
-│   ├── database/            # SQLAlchemy models and migrations
-│   │   ├── models.py        # ORM models
-│   │   ├── db.py            # Database connection and setup
-│   │   └── migrations.py    # Schema migrations
-│   ├── services/            # Business logic
-│   │   ├── scanner.py       # File system scanner
-│   │   ├── watcher.py       # File system watcher
-│   │   ├── als_parser.py    # .als file parser
-│   │   ├── live_detector.py # Live version detection
-│   │   ├── live_launcher.py # Live launcher
-│   │   ├── link_scanner.py  # Ableton Link discovery
-│   │   ├── export_tracker.py # Export tracking
-│   │   ├── smart_collections.py # Smart collection rules
-│   │   ├── duplicate_detector.py # Duplicate detection
-│   │   ├── health_calculator.py # Health metrics
-│   │   ├── audio_preview.py # Audio preview generation
-│   │   ├── audio_player.py  # In-app audio playback
-│   │   └── archive_service.py # Project backup/archive
-│   ├── ui/                  # PyQt6 UI components
-│   │   ├── main_window.py   # Main application window
-│   │   ├── theme.py         # Dark Ableton theme
-│   │   ├── widgets/         # Reusable UI widgets
-│   │   └── dialogs/         # Modal dialogs
-│   └── utils/               # Utility functions
-├── tests/                   # Test suite
-├── resources/               # Icons, images, styles
-│   ├── images/              # Application images
-│   ├── icons/               # Application icons
-│   └── styles/              # Stylesheets
-├── docs/                    # Documentation
+│   ├── main.py                     # Application entry point
+│   ├── app.py                      # Main QApplication setup
+│   ├── config.py                   # Configuration manager
+│   ├── database/                   # SQLAlchemy models and migrations
+│   │   ├── models.py               # ORM models
+│   │   ├── db.py                   # Database connection and setup
+│   │   └── migrations.py           # Schema migrations
+│   ├── services/                   # Business logic
+│   │   ├── scanner.py              # File system scanner
+│   │   ├── watcher.py              # File system watcher
+│   │   ├── als_parser.py           # .als file parser
+│   │   ├── live_detector.py        # Live version detection
+│   │   ├── live_launcher.py        # Live launcher
+│   │   ├── link_scanner.py         # Ableton Link discovery
+│   │   ├── export_tracker.py       # Export tracking
+│   │   ├── smart_collections.py    # Smart collection rules
+│   │   ├── duplicate_detector.py   # Duplicate detection
+│   │   ├── health_calculator.py    # Health metrics
+│   │   ├── audio_preview.py        # Audio preview generation
+│   │   ├── audio_player.py         # In-app audio playback
+│   │   └── archive_service.py      # Project backup/archive
+│   ├── ui/                         # PyQt6 UI components
+│   │   ├── main_window.py          # Main application window
+│   │   ├── theme.py                # Dark Ableton theme
+│   │   ├── widgets/                # Reusable UI widgets
+│   │   └── dialogs/                # Modal dialogs
+│   └── utils/                      # Utility functions
+├── tests/                          # Test suite
+├── resources/                      # Icons, images, styles
+│   ├── images/                     # Application images
+│   ├── icons/                      # Application icons
+│   └── styles/                     # Stylesheets
+├── docs/                           # Documentation
 │   ├── FEATURE_RECOMMENDATIONS.md
 │   └── PHASE_25_IMPLEMENTATION.md
-├── requirements.txt        # Python dependencies
-├── pyproject.toml          # Project configuration
-└── README.md               # This file
+├── requirements.txt                # Python dependencies
+├── pyproject.toml                  # Project configuration
+└── README.md                       # This file
 ```
 
 ### Default Project Locations
