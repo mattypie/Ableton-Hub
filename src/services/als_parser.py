@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 
+from ..utils.logging import get_logger
+
 # Try to use lxml for better XPath support and performance
 try:
     from lxml import etree as lxml_ET
@@ -108,6 +110,11 @@ class ProjectMetadata:
     annotation: Optional[str] = None  # Project annotation/notes
     master_track_name: Optional[str] = None  # Master track name (sometimes used as song name)
     
+    # Musical key/scale information
+    musical_key: Optional[str] = None  # Root note (e.g., "C", "D#", "A")
+    scale_type: Optional[str] = None  # Scale type (e.g., "Major", "Minor", "Dorian")
+    is_in_key: Optional[bool] = None  # Whether "In Key" mode is enabled globally
+    
     # Extended metadata for ML features (Phase 5)
     extended: Optional[ExtendedMetadata] = None
     
@@ -129,6 +136,7 @@ class ALSParser:
             extract_extended: If True, extract extended metadata for ML features.
             use_lxml: Force lxml usage (True), disable it (False), or auto-detect (None).
         """
+        self.logger = get_logger(__name__)
         self._cache: Dict[str, ProjectMetadata] = {}
         self._extract_extended = extract_extended
         self._use_lxml = use_lxml if use_lxml is not None else USE_LXML
@@ -198,6 +206,12 @@ class ALSParser:
             if self._extract_extended:
                 metadata.extended = self._extract_extended_metadata(root)
             
+            # Extract musical key/scale information
+            key_info = self._extract_key_info(root)
+            metadata.musical_key = key_info.get('key')
+            metadata.scale_type = key_info.get('scale')
+            metadata.is_in_key = key_info.get('is_in_key')
+            
             # Cache result
             self._cache[cache_key] = metadata
             
@@ -205,17 +219,22 @@ class ALSParser:
             
         except Exception as e:
             # Log error but don't crash
-            print(f"Error parsing {als_path}: {e}")
+            self.logger.error(f"Error parsing {als_path}: {e}", exc_info=True)
             return None
     
     def _extract_version(self, root: ET.Element) -> Optional[str]:
         """Extract Ableton Live version from project."""
-        # Look for AbletonLiveProject element with Creator attribute
+        # The Creator attribute is on the root "Ableton" element
+        creator = root.get('Creator')
+        if creator:
+            # Creator format: "Ableton Live 12.3" or "Ableton Live 11.3.10"
+            return creator
+        
+        # Fallback: look for AbletonLiveProject element (older format)
         for elem in root.iter():
             if 'AbletonLiveProject' in elem.tag:
                 creator = elem.get('Creator')
                 if creator:
-                    # Creator format: "Ableton Live 11.3.10"
                     return creator
         return None
     
@@ -618,7 +637,7 @@ class ALSParser:
         # Extract scene count
         extended.scene_count = self._extract_scene_count(root)
         
-        # Extract key/scale if present
+        # Extract key/scale if present (uses same priority logic as main metadata)
         key_info = self._extract_key_info(root)
         extended.musical_key = key_info.get('key')
         extended.scale_type = key_info.get('scale')
@@ -806,32 +825,164 @@ class ALSParser:
                         count += 1
         return count
     
-    def _extract_key_info(self, root: ET.Element) -> Dict[str, Optional[str]]:
-        """Extract musical key and scale information if present."""
+    def _extract_key_info(self, root: ET.Element) -> Dict[str, Any]:
+        """Extract musical key and scale information with priority logic.
+        
+        Priority:
+        1. Global project scale (LiveSet > ScaleInformation)
+        2. If all clips agree on a scale (or are not set), use that
+        3. If not set or conflicting, return None
+        
+        Returns:
+            Dict with 'key', 'scale', and 'is_in_key' keys.
+        """
         info = {
             'key': None,
-            'scale': None
+            'scale': None,
+            'is_in_key': None
         }
         
-        # Look for scale information in the project
+        # Key mapping (0-11 to note names)
+        key_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+        
+        # Scale name mapping (0-24 map to scale types)
+        scale_name_map = {
+            '0': 'Major',
+            '1': 'Minor',
+            '2': 'Dorian',
+            '3': 'Mixolydian',
+            '4': 'Lydian',
+            '5': 'Phrygian',
+            '6': 'Locrian',
+            '7': 'Diminished',
+            '8': 'Whole Half',
+            '9': 'Whole Tone',
+            '10': 'Minor Blues',
+            '11': 'Minor Pentatonic',
+            '12': 'Major Pentatonic',
+            '13': 'Harmonic Minor',
+            '14': 'Melodic Minor',
+            '15': 'Super Locrian',
+            '16': 'Bhairav',
+            '17': 'Hungarian Minor',
+            '18': 'Minor Gypsy',
+            '19': 'Hirojoshi',
+            '20': 'In-Sen',
+            '21': 'Iwato',
+            '22': 'Kumoi',
+            '23': 'Pelog',
+            '24': 'Spanish',
+        }
+        
+        # Step 1: Check for global project scale (LiveSet > ScaleInformation)
+        global_key = None
+        global_scale = None
+        global_is_in_key = None
+        
+        liveset = None
         for elem in root.iter():
-            if 'Scale' in elem.tag or 'RootNote' in elem.tag:
-                # Key mapping (0-11 to note names)
-                key_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+            if elem.tag == 'LiveSet':
+                liveset = elem
+                break
+        
+        if liveset is not None:
+            # First, check for InKey setting
+            for child in liveset:
+                if child.tag == 'InKey':
+                    inkey_value = child.get('Value', 'false')
+                    global_is_in_key = inkey_value.lower() == 'true'
+                    break
+            
+            # Then check for ScaleInformation
+            for child in liveset:
+                if child.tag == 'ScaleInformation':
+                    # Extract Root and Name
+                    root_value = None
+                    name_value = None
+                    for subchild in child:
+                        if subchild.tag == 'Root':
+                            root_value = subchild.get('Value')
+                        elif subchild.tag == 'Name':
+                            name_value = subchild.get('Value')
+                    
+                    # Extract scale information
+                    if root_value is not None and name_value is not None:
+                        try:
+                            root_idx = int(root_value)
+                            name_idx = int(name_value)
+                            
+                            # If InKey is enabled, even Root=0/Name=0 means "C Major" is set
+                            # Otherwise, only consider non-default values as "set"
+                            if global_is_in_key is True or (root_idx != 0 or name_idx != 0):
+                                if 0 <= root_idx < 12:
+                                    global_key = key_names[root_idx]
+                                name_str = str(name_idx)
+                                if name_str in scale_name_map:
+                                    global_scale = scale_name_map[name_str]
+                        except (ValueError, TypeError):
+                            pass
+                    break
+        
+        # Step 2: Check clip scales
+        clip_scales = []
+        for clip_elem in root.iter():
+            if clip_elem.tag in ['AudioClip', 'MidiClip']:
+                clip_key = None
+                clip_scale = None
                 
-                root_note = elem.get('RootNote')
-                if root_note is not None:
-                    try:
-                        note_idx = int(root_note)
-                        if 0 <= note_idx < 12:
-                            info['key'] = key_names[note_idx]
-                    except (ValueError, TypeError):
-                        pass
+                # Look for ScaleInformation within the clip
+                for child in clip_elem.iter():
+                    if child.tag == 'ScaleInformation':
+                        root_value = None
+                        name_value = None
+                        for subchild in child:
+                            if subchild.tag == 'Root':
+                                root_value = subchild.get('Value')
+                            elif subchild.tag == 'Name':
+                                name_value = subchild.get('Value')
+                        
+                        if root_value is not None and name_value is not None:
+                            try:
+                                root_idx = int(root_value)
+                                name_idx = int(name_value)
+                                # Only consider it set if not default (0/0)
+                                if root_idx != 0 or name_idx != 0:
+                                    if 0 <= root_idx < 12:
+                                        clip_key = key_names[root_idx]
+                                    name_str = str(name_idx)
+                                    if name_str in scale_name_map:
+                                        clip_scale = scale_name_map[name_str]
+                            except (ValueError, TypeError):
+                                pass
+                        break
                 
-                # Scale type (Major/Minor/etc.)
-                scale_name = elem.get('Name')
-                if scale_name:
-                    info['scale'] = scale_name
+                # Only add if clip has a scale set
+                if clip_key is not None or clip_scale is not None:
+                    clip_scales.append({
+                        'key': clip_key,
+                        'scale': clip_scale
+                    })
+        
+        # Step 3: Apply priority logic
+        # Priority 1: Use global scale if set
+        if global_key is not None or global_scale is not None:
+            info['key'] = global_key
+            info['scale'] = global_scale
+            info['is_in_key'] = global_is_in_key
+        # Priority 2: If all clips agree (or are not set), use clip scale
+        elif clip_scales:
+            # Check if all clips have the same scale
+            unique_scales = set()
+            for clip_scale_info in clip_scales:
+                scale_str = f"{clip_scale_info['key']}:{clip_scale_info['scale']}"
+                unique_scales.add(scale_str)
+            
+            # If all clips agree on one scale, use it
+            if len(unique_scales) == 1:
+                first_scale = clip_scales[0]
+                info['key'] = first_scale['key']
+                info['scale'] = first_scale['scale']
+                info['is_in_key'] = None  # Not applicable for clip-based scale
         
         return info
     

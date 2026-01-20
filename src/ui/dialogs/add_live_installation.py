@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, QEvent
 
 from ...database import get_session, LiveInstallation
 from ...services.live_detector import LiveDetector
+from ...utils.logging import get_logger
 from ..theme import AbletonTheme
 
 
@@ -19,6 +20,7 @@ class AddLiveInstallationDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.logger = get_logger(__name__)
         self.installation_id: Optional[int] = None
         self._setup_ui()
         # Set dialog to be modal and centered on parent
@@ -173,7 +175,7 @@ class AddLiveInstallationDialog(QDialog):
                     if not self.name_input.text():
                         self.name_input.setText(f"Live {version_str}")
         except Exception as e:
-            print(f"[DIALOG] Error auto-detecting: {e}")
+            self.logger.error(f"Error auto-detecting: {e}", exc_info=True)
     
     def _on_save(self) -> None:
         """Save the installation."""

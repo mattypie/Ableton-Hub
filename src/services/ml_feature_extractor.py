@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 from dataclasses import dataclass, field
 
+from ..utils.logging import get_logger
+
 # Type checking imports (not loaded at runtime)
 if TYPE_CHECKING:
     import numpy as np
@@ -144,8 +146,8 @@ class MLFeatureExtractor:
     
     def __init__(self, 
                  extract_audio_features: bool = True,
-                 use_extended_als: bool = True,
-                 normalize_features: bool = True):
+            use_extended_als: bool = True,
+            normalize_features: bool = True):
         """Initialize the feature extractor.
         
         Args:
@@ -153,6 +155,7 @@ class MLFeatureExtractor:
             use_extended_als: Whether to use extended ALS metadata extraction.
             normalize_features: Whether to normalize the combined feature vector.
         """
+        self.logger = get_logger(__name__)
         self._als_parser = ALSParser(extract_extended=use_extended_als)
         self._asd_parser = ASDParser()
         self._extract_audio_requested = extract_audio_features
@@ -348,7 +351,7 @@ class MLFeatureExtractor:
             return features
             
         except Exception as e:
-            print(f"Error extracting audio features from {audio_path}: {e}")
+            self.logger.error(f"Error extracting audio features from {audio_path}: {e}", exc_info=True)
             return None
     
     def _audio_features_to_vector(self, features: AudioFeatures) -> List[float]:

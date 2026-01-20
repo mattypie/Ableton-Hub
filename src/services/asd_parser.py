@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 
+from ..utils.logging import get_logger
+
 
 @dataclass
 class WarpMarker:
@@ -114,6 +116,7 @@ class ASDParser:
     
     def __init__(self):
         """Initialize the parser."""
+        self.logger = get_logger(__name__)
         self._cache: Dict[str, ClipAnalysisData] = {}
     
     def parse(self, asd_path: Path) -> Optional[ClipAnalysisData]:
@@ -146,7 +149,7 @@ class ASDParser:
             return result
             
         except Exception as e:
-            print(f"Error parsing ASD file {asd_path}: {e}")
+            self.logger.error(f"Error parsing ASD file {asd_path}: {e}", exc_info=True)
             return None
     
     def _parse_asd_data(self, data: bytes) -> ClipAnalysisData:
@@ -191,7 +194,7 @@ class ASDParser:
                 result.sample_rate = sample_rate
                 
         except Exception as e:
-            print(f"Error parsing ASD data structure: {e}")
+            self.logger.error(f"Error parsing ASD data structure: {e}", exc_info=True)
         
         return result
     

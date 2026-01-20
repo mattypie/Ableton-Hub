@@ -138,9 +138,19 @@ If you prefer to download the source code and install manually:
    This may take a few minutes as it downloads and installs all required packages.
 
 5. **Run the application**:
+   
+   **Option A: Command Line**
    ```bash
    python -m src.main
    ```
+   
+   **Option B: Launcher Script** (Easier - no command line needed)
+   - Double-click `run-ableton-hub.bat` to run the application
+   - **Tip**: Create a desktop shortcut to `run-ableton-hub.bat` for easy access:
+     1. Right-click `run-ableton-hub.bat`
+     2. Select "Create shortcut"
+     3. Drag the shortcut to your desktop
+     4. You can rename it to "Ableton Hub" if you like
 
    The application should launch!
 

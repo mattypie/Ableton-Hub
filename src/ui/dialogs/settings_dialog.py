@@ -100,7 +100,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(theme_group)
         
         # Waveform color mode selection
-        waveform_group = QGroupBox("Waveform Color")
+        waveform_group = QGroupBox("Waveform Color Gradient")
         waveform_layout = QVBoxLayout(waveform_group)
         
         self.waveform_group = QButtonGroup(self)
@@ -108,11 +108,19 @@ class SettingsDialog(QDialog):
         # Get current waveform color mode
         current_waveform_mode = getattr(self.config.ui, 'waveform_color_mode', 'rainbow')
         
-        # Waveform color mode options
+        # Waveform color mode options (gradients only, solid colors disabled)
         waveform_modes = {
-            "rainbow": "Rainbow (Gradient)",
-            "random": "Random (Per Project)",
-            "accent": "Accent (Green)"
+            "rainbow": "Rainbow",
+            "dark_blue_cyan": "Dark Blue → Cyan",
+            "orange_red": "Orange → Red",
+            "purple_cyan": "Purple → Cyan",
+            "green_red": "Green → Red",
+            "pink_orange": "Pink → Orange",
+            "teal_blue": "Teal → Blue",
+            "yellow_green": "Yellow → Green",
+            "magenta_pink": "Magenta → Pink",
+            "cyan_green": "Cyan → Green",
+            "random": "Random (Per Project, Changes on Rescan)"
         }
         
         self.waveform_radios = {}
@@ -124,7 +132,12 @@ class SettingsDialog(QDialog):
             waveform_layout.addWidget(radio)
         
         # Info label
-        info_label = QLabel("Note: Existing thumbnails will keep their current colors.\nUse 'Clear Thumbnail Cache' in Tools menu to regenerate.")
+        info_text = (
+            "Note: Existing thumbnails will keep their current colors.\n"
+            "Use 'Clear Thumbnail Cache' in Tools menu to regenerate.\n\n"
+            "Random mode: Each project gets a random color gradient, which changes when you rescan."
+        )
+        info_label = QLabel(info_text)
         info_label.setWordWrap(True)
         info_label.setStyleSheet("color: #888; font-size: 10px;")
         waveform_layout.addWidget(info_label)

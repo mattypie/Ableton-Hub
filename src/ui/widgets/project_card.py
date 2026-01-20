@@ -68,7 +68,11 @@ class ProjectCard(QFrame):
         # Tooltip will be set in _update_display
         layout.addWidget(self.preview_label)
         
-        # Project name (centered)
+        # Project name row (centered) with favorite indicator
+        name_row = QHBoxLayout()
+        name_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        name_row.setSpacing(4)
+        
         self.name_label = QLabel()
         self.name_label.setWordWrap(True)
         self.name_label.setMaximumHeight(40)
@@ -81,7 +85,14 @@ class ProjectCard(QFrame):
             font.setPixelSize(15)
         self.name_label.setFont(font)
         # Tooltip will be set in _update_display
-        layout.addWidget(self.name_label)
+        name_row.addWidget(self.name_label)
+        
+        # Favorite indicator (gemstone icon) next to title
+        self.favorite_indicator = QLabel()
+        self.favorite_indicator.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 12px;")
+        name_row.addWidget(self.favorite_indicator)
+        
+        layout.addLayout(name_row)
         
         layout.addStretch()
         
@@ -137,11 +148,14 @@ class ProjectCard(QFrame):
         """)
         bottom_row.addWidget(self.location_label)
         
+        # Live version indicator
+        self.version_label = QLabel()
+        self.version_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;")
+        self.version_label.setVisible(False)  # Hidden by default until version is set
+        bottom_row.addWidget(self.version_label)
+        
         self.export_indicator = QLabel()
         bottom_row.addWidget(self.export_indicator)
-        
-        self.favorite_indicator = QLabel()
-        bottom_row.addWidget(self.favorite_indicator)
         
         layout.addLayout(bottom_row)
     
@@ -195,14 +209,20 @@ class ProjectCard(QFrame):
         except Exception:
             has_exports = False
         
+        # Check if project is missing
+        is_missing = self.project.status == ProjectStatus.MISSING
+        
         if self._selected:
             border_color = AbletonTheme.COLORS['accent']
             bg_color = AbletonTheme.COLORS['surface_light']
+        elif is_missing:
+            # Red border for missing projects
+            border_color = "#FF0000"  # Red color for missing projects
         elif has_exports:
             # Highlight projects with exports using a green accent
             border_color = "#4CAF50"  # Green color for projects with exports
         
-        # Apply project color if set (overrides export highlight)
+        # Apply project color if set (overrides export highlight and missing status)
         if self.project.color:
             border_color = self.project.color
         
@@ -223,12 +243,12 @@ class ProjectCard(QFrame):
     
     def _update_display(self) -> None:
         """Update the display with project data."""
-        # Preview thumbnail
+        # Preview thumbnail - use cached path if available, only generate if missing
         preview_path = None
         if self.project.thumbnail_path and Path(self.project.thumbnail_path).exists():
             preview_path = self.project.thumbnail_path
         else:
-            # Try to generate preview
+            # Only generate if no cached thumbnail exists
             preview_path = AudioPreviewGenerator.get_or_generate_preview(self.project.id)
         
         if preview_path and Path(preview_path).exists():
@@ -247,6 +267,21 @@ class ProjectCard(QFrame):
         
         # Name
         self.name_label.setText(self.project.name)
+        
+        # Style name label for missing projects (dark orange with yellow)
+        if self.project.status == ProjectStatus.MISSING:
+            self.name_label.setStyleSheet(f"""
+                QLabel {{
+                    color: #FF8C00;  /* Dark orange */
+                    background-color: #FFD700;  /* Yellow background */
+                    padding: 2px 4px;
+                    border-radius: 3px;
+                    font-weight: bold;
+                }}
+            """)
+        else:
+            # Reset to default styling (clear any previous styling)
+            self.name_label.setStyleSheet("")
         
         # Unified tooltip for preview and name (small font, centered)
         tooltip_html = f'<div style="font-size: 10px; text-align: center;">'
@@ -275,6 +310,17 @@ class ProjectCard(QFrame):
         # Automation
         automation_status = "Yes" if self.project.has_automation else "No"
         tooltip_html += f'Automation: {automation_status}<br/>'
+        
+        # Version
+        version_display = self.project.get_live_version_display()
+        if version_display:
+            full_version = self.project.ableton_version or version_display
+            tooltip_html += f'Version: {full_version}<br/>'
+        
+        # Key/Scale
+        key_display = self.project.get_key_display()
+        if key_display:
+            tooltip_html += f'Key: {key_display}<br/>'
         
         # File size
         if self.project.file_size and self.project.file_size > 0:
@@ -380,6 +426,14 @@ class ProjectCard(QFrame):
             # If relationship is detached, hide location
             self.location_label.setVisible(False)
         
+        # Live version
+        version_display = self.project.get_live_version_display()
+        if version_display:
+            self.version_label.setText(version_display)
+            self.version_label.setVisible(True)
+        else:
+            self.version_label.setVisible(False)
+        
         # Export indicator
         # Access exports list safely (may be detached)
         try:
@@ -432,13 +486,16 @@ class ProjectCard(QFrame):
         t = (tempo - 60) / 140.0
         
         # Rainbow colors: purple -> blue -> cyan -> green -> yellow -> orange -> red
+        # Brightened purple and blue for better readability
         if t < 0.167:  # Purple to Blue
-            r = int(128 - 128 * (t / 0.167))
+            # Start with bright purple (#cc00ff) instead of dark purple
+            r = int(204 - 51 * (t / 0.167))  # 204 -> 153 (bright purple to bright blue-purple)
             g = 0
-            b = int(128 + 127 * (t / 0.167))
+            b = int(255 - 51 * (t / 0.167))  # 255 -> 204 (bright purple to bright blue-purple)
         elif t < 0.333:  # Blue to Cyan
+            # Start with bright blue (#0066ff) instead of dark blue
             r = 0
-            g = int(255 * ((t - 0.167) / 0.167))
+            g = int(102 + 153 * ((t - 0.167) / 0.167))  # 102 -> 255 (bright blue to cyan)
             b = 255
         elif t < 0.5:  # Cyan to Green
             r = 0

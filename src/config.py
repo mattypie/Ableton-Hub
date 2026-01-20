@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import List, Optional, Any
 from .utils.paths import get_config_path
+from .utils.logging import get_logger
 
 
 @dataclass
@@ -63,7 +64,7 @@ class UIConfig:
     show_status_bar: bool = True
     confirm_delete: bool = True
     date_format: str = "%Y-%m-%d %H:%M"
-    waveform_color_mode: str = "rainbow"  # "rainbow", "random", or "accent"
+    waveform_color_mode: str = "rainbow"  # Gradient modes only: "rainbow", "random", or gradient options (solid colors disabled)
 
 
 @dataclass
@@ -111,7 +112,8 @@ class ConfigManager:
                 data = json.load(f)
             return self._dict_to_config(data)
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Warning: Failed to load config: {e}")
+            logger = get_logger(__name__)
+            logger.warning(f"Failed to load config: {e}")
             return Config()
     
     def save(self) -> None:
@@ -124,7 +126,8 @@ class ConfigManager:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(self._config_to_dict(self._config), f, indent=2)
         except IOError as e:
-            print(f"Warning: Failed to save config: {e}")
+            logger = get_logger(__name__)
+            logger.warning(f"Failed to save config: {e}")
     
     def reset(self) -> Config:
         """Reset configuration to defaults.

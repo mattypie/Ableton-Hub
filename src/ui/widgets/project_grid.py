@@ -62,9 +62,9 @@ class ProjectGrid(QWidget):
         
         # List view (table)
         self.table = QTableWidget()
-        self.table.setColumnCount(9)
+        self.table.setColumnCount(11)
         self.table.setHorizontalHeaderLabels([
-            "Name", "Location", "Tempo", "Length", "Size", "Modified", "Tags", "Export", "Status"
+            "Name", "Location", "Tempo", "Length", "Size", "Modified", "Version", "Key", "Tags", "Export", "Status"
         ])
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
@@ -82,9 +82,10 @@ class ProjectGrid(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Length
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Size
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Modified
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Tags
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Export
-        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)  # Status
+        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Version
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)  # Tags
+        header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)  # Export
+        header.setSectionResizeMode(9, QHeaderView.ResizeMode.ResizeToContents)  # Status
         
         # Enable clickable headers for sorting
         header.setSectionsClickable(True)
@@ -248,9 +249,37 @@ class ProjectGrid(QWidget):
                 date_str = ""
             self.table.setItem(row, 5, QTableWidgetItem(date_str))
             
-            # Tags
-            tags_str = ", ".join([tag.name for tag in project.tags]) if project.tags else ""
-            self.table.setItem(row, 6, QTableWidgetItem(tags_str))
+            # Version
+            version_display = project.get_live_version_display() or ""
+            version_item = QTableWidgetItem(version_display)
+            version_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.table.setItem(row, 6, version_item)
+            
+            # Key/Scale
+            key_display = project.get_key_display() or ""
+            key_item = QTableWidgetItem(key_display)
+            key_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+            self.table.setItem(row, 7, key_item)
+            
+            # Tags - tags are stored as JSON array of tag IDs
+            tags_str = ""
+            try:
+                if project.tags and isinstance(project.tags, list):
+                    # Tags are stored as list of tag IDs, need to look up names
+                    from ...database import get_session, Tag
+                    session = get_session()
+                    try:
+                        tag_ids = [t for t in project.tags if isinstance(t, int)]
+                        if tag_ids:
+                            tags = session.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+                            tag_names = [tag.name for tag in tags]
+                            tags_str = ", ".join(tag_names) if tag_names else ""
+                    finally:
+                        session.close()
+            except (AttributeError, TypeError, Exception):
+                # Tags not loaded or invalid
+                tags_str = ""
+            self.table.setItem(row, 8, QTableWidgetItem(tags_str))
             
             # Export status
             # Access exports safely (may be detached)
@@ -259,11 +288,11 @@ class ProjectGrid(QWidget):
             except Exception:
                 has_exports = False
             export_str = "✓" if has_exports else ""
-            self.table.setItem(row, 7, QTableWidgetItem(export_str))
+            self.table.setItem(row, 9, QTableWidgetItem(export_str))
             
             # Status
             status_str = project.status.value if project.status else ""
-            self.table.setItem(row, 8, QTableWidgetItem(status_str))
+            self.table.setItem(row, 10, QTableWidgetItem(status_str))
     
     def _on_card_clicked(self, project_id: int) -> None:
         """Handle card click."""
@@ -312,9 +341,11 @@ class ProjectGrid(QWidget):
             3: "length",
             4: "size",
             5: "modified",
-            6: "tags",
-            7: "export",
-            8: "status"
+            6: "version",
+            7: "key",
+            8: "tags",
+            9: "export",
+            10: "status"
         }
         
         sort_field = column_map.get(column)

@@ -31,6 +31,7 @@ Built with Python (programming language) and PyQt6 (GUI framework), Ableton Hub 
 - **Project Metadata Extraction**: Automatically extracts rich metadata from `.als` files including:
   - Plugins and devices used
   - Tempo and time signature
+  - Musical key and scale type (e.g., C Major, D# Minor)
   - Track counts (audio, MIDI, return tracks)
   - Arrangement length
   - Ableton Live version
@@ -167,6 +168,8 @@ Built with Python (programming language) and PyQt6 (GUI framework), Ableton Hub 
   - Name (A-Z / Z-A)
   - Location (ascending / descending)
   - Tempo (low to high / high to low)
+  - Musical Key (A-Z / Z-A)
+  - Ableton Live Version (v9, v10, v11, v12)
   - Modified date (newest / oldest)
   - Tags, Export status, and more
 - **Learning Resources**: Built-in links to:
@@ -251,9 +254,18 @@ If you prefer to download the source code and install manually:
    ```
 
 6. **Run the application**:
+   
+   **Option A: Command Line**
    ```bash
    python -m src.main
    ```
+   
+   **Option B: Windows Launcher Script** (Windows only)
+   - Double-click `run-ableton-hub.bat` to run the application
+   - **Tip**: Create a desktop shortcut to `run-ableton-hub.bat` for easy access:
+     1. Right-click `run-ableton-hub.bat` → "Create shortcut"
+     2. Drag the shortcut to your desktop
+     3. Rename it to "Ableton Hub" if desired
 
 ### Platform-Specific Installation Guides
 
@@ -446,7 +458,7 @@ The application follows a layered architecture:
 1. **Clone the repository** (using git - version control system):
    ```bash
    git clone https://github.com/yourusername/ableton-hub.git
-   cd ableton-hub/ableton_hub
+   cd ableton-hub
    ```
    
    **Note**: If downloading as ZIP instead of using git clone, extract the ZIP and navigate to the `Ableton-Hub-main` folder (the folder name when downloading from GitHub).
@@ -462,26 +474,6 @@ The application follows a layered architecture:
    venv\Scripts\activate
    ```
 
-3. **Install with dev dependencies**:
-   ```bash
-   pip install -e ".[dev]"
-   ```
-
-4. **Run tests**:
-   ```bash
-   pytest
-   ```
-
-5. **Format code**:
-   ```bash
-   black src tests
-   ruff check src tests --fix
-   ```
-
-6. **Type checking**:
-   ```bash
-   mypy src
-   ```
 
 ### Application Data Locations
 
@@ -646,12 +638,15 @@ The application can automatically detect default Ableton project folders (only e
 The application parses Ableton Live Set (`.als`) files to extract metadata. The parser reads:
 - **Project Information**: Name, Live version, creation/modification dates
 - **Tempo & Time Signature**: Current song tempo and time signature
+- **Musical Key & Scale**: Global project key/scale and clip-level key/scale information
 - **Track Information**: Audio tracks, MIDI tracks, return tracks, master track
 - **Device & Plugin Data**: All devices and plugins used in the project
 - **Arrangement Data**: Arrangement length (bars), automation status
 - **Sample References**: Linked audio files and samples
 
 The parser handles `.als` files from Live 9.x through Live 12.x. The `.als` format is XML-based (eXtensible Markup Language), and the parser uses standard XML parsing with error handling for malformed files.
+
+**Key/Scale Detection**: The parser extracts musical key and scale information from both global project settings and clip-level settings. Priority is given to the global key/scale setting, with fallback to clip scales if all clips agree. Key information is displayed in project card tooltips and the list view "Key" column, and can be sorted alphabetically.
 
 #### Live Version Compatibility
 
@@ -723,7 +718,9 @@ Contributions are welcome! Please follow these guidelines:
 - ✅ Smart fuzzy matching for export-to-project linking
 - ✅ Status bar playback display
 - ✅ Tempo filtering and sorting
-- ✅ Sortable list view with column headers
+- ✅ Musical key and scale detection from project files
+- ✅ Key/scale display in project cards and list view
+- ✅ Sortable list view with column headers (including Key and Version)
 - ✅ In-app audio playback for exports
 - ✅ Project backup and archive system
 - ✅ Backup project detection and exclusion from grid

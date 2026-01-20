@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import List, Optional, Dict
 from dataclasses import dataclass
 
+from ..utils.logging import get_logger
+
 
 @dataclass
 class LiveVersion:
@@ -25,6 +27,7 @@ class LiveDetector:
     """Detects installed Ableton Live versions on the system."""
     
     def __init__(self):
+        self.logger = get_logger(__name__)
         self._versions: List[LiveVersion] = []
         self._scan()
     
@@ -72,31 +75,31 @@ class LiveDetector:
         
         # Scan all base paths for "Ableton" folders
         for base_path in base_search_paths:
-            print(f"[LIVE DETECT] Checking base path: {base_path}")
+            self.logger.debug(f"Checking base path: {base_path}")
             if not base_path.exists():
-                print(f"[LIVE DETECT] Base path does not exist: {base_path}")
+                self.logger.debug(f"Base path does not exist: {base_path}")
                 continue
             
             try:
                 # Look for "Ableton" folder in this base path
                 ableton_folder = base_path / "Ableton"
-                print(f"[LIVE DETECT] Checking for Ableton folder: {ableton_folder}")
+                self.logger.debug(f"Checking for Ableton folder: {ableton_folder}")
                 if not ableton_folder.exists():
-                    print(f"[LIVE DETECT] Ableton folder does not exist: {ableton_folder}")
+                    self.logger.debug(f"Ableton folder does not exist: {ableton_folder}")
                     # Also check if there are any folders starting with "Ableton" or containing "Live"
                     try:
                         for item in base_path.iterdir():
                             if item.is_dir() and ("Ableton" in item.name or "Live" in item.name):
-                                print(f"[LIVE DETECT] Found potential Ableton/Live folder: {item}")
+                                self.logger.debug(f"Found potential Ableton/Live folder: {item}")
                     except (PermissionError, OSError):
                         pass
                     continue
                 
                 if not ableton_folder.is_dir():
-                    print(f"[LIVE DETECT] Path exists but is not a directory: {ableton_folder}")
+                    self.logger.debug(f"Path exists but is not a directory: {ableton_folder}")
                     continue
                 
-                print(f"[LIVE DETECT] Found Ableton folder: {ableton_folder}, scanning contents...")
+                self.logger.debug(f"Found Ableton folder: {ableton_folder}, scanning contents...")
                 
                 # Now scan inside the Ableton folder for Live installations
                 # Support Live 10, Live 11, Live 12, and future versions
@@ -106,7 +109,7 @@ class LiveDetector:
                     if not item.is_dir():
                         continue
                     
-                    print(f"[LIVE DETECT] Checking item in Ableton folder: {item.name}")
+                    self.logger.debug(f"Checking item in Ableton folder: {item.name}")
                     
                     # Match patterns like:
                     # - "Live 10", "Live 11", "Live 12"
@@ -122,7 +125,7 @@ class LiveDetector:
                         
                         # Only process Live 10, 11, 12 (and future versions >= 10)
                         if major_version >= 10:
-                            print(f"[LIVE DETECT] Matched Live pattern: {item.name} -> version {version_num} (major: {major_version})")
+                            self.logger.debug(f"Matched Live pattern: {item.name} -> version {version_num} (major: {major_version})")
                             
                             # Try multiple possible locations for Live.exe
                             possible_paths = [
@@ -148,10 +151,10 @@ class LiveDetector:
                             
                             live_exe = None
                             for exe_path in possible_paths:
-                                print(f"[LIVE DETECT] Checking for Live.exe at: {exe_path}")
+                                self.logger.debug(f"Checking for Live.exe at: {exe_path}")
                                 if exe_path.exists():
                                     live_exe = exe_path
-                                    print(f"[LIVE DETECT] Found Live.exe: {live_exe}")
+                                    self.logger.debug(f"Found Live.exe: {live_exe}")
                                     break
                             
                             if live_exe:
@@ -166,24 +169,24 @@ class LiveDetector:
                                 
                                 # Avoid duplicates (check if we already have this path)
                                 if not any(v.path == live_exe for v in self._versions):
-                                    print(f"[LIVE DETECT] Adding Live version: {version_str} {'Suite' if is_suite else 'Standard'} at {live_exe}")
+                                    self.logger.info(f"Adding Live version: {version_str} {'Suite' if is_suite else 'Standard'} at {live_exe}")
                                     self._versions.append(LiveVersion(
                                         version=version_str,
                                         path=live_exe,
                                         is_suite=is_suite
                                     ))
                             else:
-                                print(f"[LIVE DETECT] Live.exe not found in any expected location for: {item.name}")
+                                self.logger.debug(f"Live.exe not found in any expected location for: {item.name}")
                         else:
-                            print(f"[LIVE DETECT] Skipping Live version {major_version} (only supporting Live 10+)")
+                            self.logger.debug(f"Skipping Live version {major_version} (only supporting Live 10+)")
                             continue
                     else:
-                        print(f"[LIVE DETECT] Item does not match Live pattern: {item.name}")
+                        self.logger.debug(f"Item does not match Live pattern: {item.name}")
                 
                 if found_items:
-                    print(f"[LIVE DETECT] All items in {ableton_folder}: {', '.join(found_items)}")
+                    self.logger.debug(f"All items in {ableton_folder}: {', '.join(found_items)}")
             except (PermissionError, OSError) as e:
-                print(f"[LIVE DETECT] Error accessing {base_path}: {e}")
+                self.logger.warning(f"Error accessing {base_path}: {e}")
                 # Skip paths we can't access
                 continue
     
@@ -233,7 +236,7 @@ class LiveDetector:
                                 
                                 # Avoid duplicates
                                 if not any(v.path == live_exe for v in self._versions):
-                                    print(f"[LIVE DETECT] Adding Live version: {version_str} {'Suite' if is_suite else 'Standard'} at {live_exe}")
+                                    self.logger.info(f"Adding Live version: {version_str} {'Suite' if is_suite else 'Standard'} at {live_exe}")
                                     self._versions.append(LiveVersion(
                                         version=version_str,
                                         path=live_exe,
@@ -267,7 +270,7 @@ class LiveDetector:
                                 is_suite = "Suite" in item.name or self._check_suite_macos(item)
                                 
                                 if not any(v.path == live_exe for v in self._versions):
-                                    print(f"[LIVE DETECT] Adding Live version from Application Support: {version_str} {'Suite' if is_suite else 'Standard'} at {live_exe}")
+                                    self.logger.info(f"Adding Live version from Application Support: {version_str} {'Suite' if is_suite else 'Standard'} at {live_exe}")
                                     self._versions.append(LiveVersion(
                                         version=version_str,
                                         path=live_exe,

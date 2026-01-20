@@ -220,13 +220,13 @@ class ScanWorker(QThread):
                         self._apply_metadata_to_project(project, metadata)
                 except Exception as e:
                     # Don't fail project creation if parsing fails
-                    print(f"Warning: Failed to parse metadata for {path}: {e}")
+                    self.logger.warning(f"Failed to parse metadata for {path}: {e}")
             
             session.add(project)
             session.commit()
             
         except Exception as e:
-            print(f"Error adding project {path}: {e}")
+            self.logger.error(f"Error adding project {path}: {e}", exc_info=True)
     
     def _update_project(self, path: Path, session) -> None:
         """Update an existing project's metadata.
@@ -249,7 +249,8 @@ class ScanWorker(QThread):
                 
                 # Re-parse metadata if file changed or never parsed
                 if self._parse_metadata and self._parser:
-                    # Check if file was modified since last parse
+                    # Check if file was modified since last parse OR never parsed
+                    # If last_parsed is None, we should always re-parse
                     file_changed = (not project.last_parsed or 
                                   datetime.fromtimestamp(stat.st_mtime) > project.last_parsed)
                     if file_changed:
@@ -257,12 +258,13 @@ class ScanWorker(QThread):
                             metadata = self._parser.parse(path)
                             if metadata:
                                 self._apply_metadata_to_project(project, metadata)
+                                session.commit()  # Commit metadata changes
                         except Exception as e:
                             # Don't fail update if parsing fails
-                            print(f"Warning: Failed to parse metadata for {path}: {e}")
+                            self.logger.warning(f"Failed to parse metadata for {path}: {e}")
                 
         except Exception as e:
-            print(f"Error updating project {path}: {e}")
+            self.logger.error(f"Error updating project {path}: {e}", exc_info=True)
     
     def _apply_metadata_to_project(self, project: Project, metadata) -> None:
         """Apply parsed metadata to a project object.
@@ -291,6 +293,11 @@ class ScanWorker(QThread):
         project.sample_references = json.dumps(metadata.sample_references) if metadata.sample_references else '[]'
         project.has_automation = metadata.has_automation
         project.last_parsed = datetime.utcnow()
+        
+        # Musical key/scale information
+        project.musical_key = metadata.musical_key
+        project.scale_type = metadata.scale_type
+        project.is_in_key = metadata.is_in_key
         
         # Auto-populate export_song_name if not already set
         # Priority: annotation > export filenames > master track name

@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Optional
 
 from .live_detector import LiveVersion, LiveDetector
+from ..utils.logging import get_logger
 
 
 class LiveLauncher:
     """Launches Ableton Live with project files."""
     
     def __init__(self):
+        self.logger = get_logger(__name__)
         self._detector = LiveDetector()
     
     def get_available_versions(self) -> list[LiveVersion]:
@@ -29,13 +31,13 @@ class LiveLauncher:
             True if launch was successful, False otherwise.
         """
         if not project_path.exists():
-            print(f"[LAUNCHER] ERROR: Project file not found: {project_path}")
+            self.logger.error(f"Project file not found: {project_path}")
             return False
         
         if live_version is None:
             versions = self._detector.get_versions()
             if not versions:
-                print("[LAUNCHER] ERROR: No Ableton Live versions found")
+                self.logger.error("No Ableton Live versions found")
                 return False
             live_version = versions[0]  # Use newest version
         
@@ -47,7 +49,7 @@ class LiveLauncher:
             else:
                 return self._launch_linux(project_path, live_version)
         except Exception as e:
-            print(f"[LAUNCHER] ERROR: Failed to launch Live: {e}")
+            self.logger.error(f"Failed to launch Live: {e}", exc_info=True)
             return False
     
     def _launch_windows(self, project_path: Path, live_version: LiveVersion) -> bool:
@@ -63,10 +65,10 @@ class LiveLauncher:
                 [str(live_version.path), str(project_path)],
                 cwd=live_version.path.parent
             )
-            print(f"[LAUNCHER] Launched {live_version} with project: {project_path.name}")
+            self.logger.info(f"Launched {live_version} with project: {project_path.name}")
             return True
         except Exception as e:
-            print(f"[LAUNCHER] ERROR: Failed to launch on Windows: {e}")
+            self.logger.error(f"Failed to launch on Windows: {e}", exc_info=True)
             return False
     
     def _launch_macos(self, project_path: Path, live_version: LiveVersion) -> bool:
@@ -80,10 +82,10 @@ class LiveLauncher:
             subprocess.Popen(
                 ['open', '-a', str(app_path), str(project_path)]
             )
-            print(f"[LAUNCHER] Launched {live_version} with project: {project_path.name}")
+            self.logger.info(f"Launched {live_version} with project: {project_path.name}")
             return True
         except Exception as e:
-            print(f"[LAUNCHER] ERROR: Failed to launch on macOS: {e}")
+            self.logger.error(f"Failed to launch on macOS: {e}", exc_info=True)
             return False
     
     def _launch_linux(self, project_path: Path, live_version: LiveVersion) -> bool:
@@ -94,10 +96,10 @@ class LiveLauncher:
                 [str(live_version.path), str(project_path)],
                 cwd=live_version.path.parent
             )
-            print(f"[LAUNCHER] Launched {live_version} with project: {project_path.name}")
+            self.logger.info(f"Launched {live_version} with project: {project_path.name}")
             return True
         except Exception as e:
-            print(f"[LAUNCHER] ERROR: Failed to launch on Linux: {e}")
+            self.logger.error(f"Failed to launch on Linux: {e}", exc_info=True)
             return False
     
     def refresh_versions(self) -> None:

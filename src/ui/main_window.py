@@ -13,6 +13,7 @@ from PyQt6.QtGui import QAction, QIcon, QKeySequence, QCloseEvent, QPixmap
 from .. import __version__, get_whats_new_html
 from ..config import Config, save_config
 from ..database import get_session, Location, Project, ProjectStatus
+from sqlalchemy import case
 from ..utils.paths import get_resources_path
 from ..utils.logging import get_logger
 from .widgets.sidebar import Sidebar
@@ -33,13 +34,13 @@ class MainWindow(QMainWindow):
     scan_requested = pyqtSignal()
     
     def __init__(self, config: Config, theme: Optional[AbletonTheme] = None):
-        self.logger = get_logger(__name__)
         """Initialize the main window.
         
         Args:
             config: Application configuration.
             theme: Optional theme instance (will get from app if not provided).
         """
+        self.logger = get_logger(__name__)
         super().__init__()
         
         self.config = config
@@ -91,8 +92,6 @@ class MainWindow(QMainWindow):
                 self.logger.warning(f"Window icon not found at: {icon_path}")
         except Exception as e:
             self.logger.error(f"Failed to set window icon: {e}", exc_info=True)
-            import traceback
-            traceback.print_exc()
     
     def _create_menus(self) -> None:
         """Create the menu bar and menus."""
@@ -692,6 +691,33 @@ class MainWindow(QMainWindow):
             elif sort_field == "size_asc":
                 # Sort by file size ascending, nulls last
                 query = query.order_by(nullslast(Project.file_size.asc()))
+            elif sort_field == "version_desc":
+                # Sort by version descending (v12, v11, v10, v9, None)
+                # Use a CASE statement to order versions numerically
+                version_order = case(
+                    (Project.ableton_version.like('%Live 12%'), 12),
+                    (Project.ableton_version.like('%Live 11%'), 11),
+                    (Project.ableton_version.like('%Live 10%'), 10),
+                    (Project.ableton_version.like('%Live 9%'), 9),
+                    else_=0
+                )
+                query = query.order_by(nullslast(version_order.desc()))
+            elif sort_field == "version_asc":
+                # Sort by version ascending (v9, v10, v11, v12, None)
+                version_order = case(
+                    (Project.ableton_version.like('%Live 9%'), 9),
+                    (Project.ableton_version.like('%Live 10%'), 10),
+                    (Project.ableton_version.like('%Live 11%'), 11),
+                    (Project.ableton_version.like('%Live 12%'), 12),
+                    else_=0
+                )
+                query = query.order_by(nullslast(version_order.asc()))
+            elif sort_field == "key_asc":
+                # Sort by musical key alphabetically (A, A#, B, C, etc.), nulls last
+                query = query.order_by(nullslast(Project.musical_key.asc()), nullslast(Project.scale_type.asc()))
+            elif sort_field == "key_desc":
+                # Sort by musical key reverse alphabetically, nulls last
+                query = query.order_by(nullslast(Project.musical_key.desc()), nullslast(Project.scale_type.desc()))
             elif sort_field == "modified_asc":
                 query = query.order_by(Project.modified_date.asc())
             else:  # "modified" or "modified_desc" is default
@@ -796,7 +822,7 @@ class MainWindow(QMainWindow):
             return
         
         # Stop all services before reset
-        print("[DB] Stopping all services before database reset...")
+        self.logger.info("Stopping all services before database reset...")
         
         # Stop scanner
         self.scan_controller.stop_scan()
@@ -825,7 +851,7 @@ class MainWindow(QMainWindow):
         close_database()
         
         # Reset database
-        print("[DB] Resetting database...")
+        self.logger.info("Resetting database...")
         success = reset_database()
         
         if success:
@@ -839,9 +865,8 @@ class MainWindow(QMainWindow):
             # Refresh UI
             self._refresh_sidebar()
             self._load_projects()
+            self.logger.info("Database reset successful - UI refreshed")
             self.scan_status_label.setText("Database reset complete")
-            
-            print("[DB] Database reset successful - UI refreshed")
         else:
             QMessageBox.critical(
                 self,
@@ -1124,21 +1149,55 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     self.logger.warning(f"Failed to delete thumbnail {thumbnail_file}: {e}")
             
-            # Clear thumbnail_path references from database
+            # Clear thumbnail_path references from database and force regeneration
             session = get_session()
             try:
-                projects_updated = session.query(Project).filter(
+                # Get all projects that have thumbnails
+                projects_with_thumbnails = session.query(Project).filter(
                     Project.thumbnail_path.isnot(None)
-                ).update({Project.thumbnail_path: None})
+                ).all()
+                projects_updated = len(projects_with_thumbnails)
+                
+                # Clear thumbnail_path for all projects
+                for project in projects_with_thumbnails:
+                    project.thumbnail_path = None
+                
                 session.commit()
                 self.logger.info(f"Cleared thumbnail_path for {projects_updated} projects")
+                
+                # Force regenerate thumbnails for ALL projects with exports using current color mode
+                # This ensures all thumbnails use the latest color mode (including new gradients)
+                from ..services.audio_preview import AudioPreviewGenerator
+                from ..config import get_config
+                from ..database import Export
+                
+                config = get_config()
+                color_mode = config.ui.waveform_color_mode
+                
+                # Get all projects that have exports (needed for thumbnail generation)
+                all_projects_with_exports = session.query(Project).join(Export).distinct().all()
+                
+                regenerated_count = 0
+                for project in all_projects_with_exports:
+                    # Force regenerate with current color mode
+                    # For random mode, this will select from all available gradients including new ones
+                    preview_path = AudioPreviewGenerator.get_or_generate_preview(
+                        project.id,
+                        color_mode=color_mode,
+                        force_regenerate=True
+                    )
+                    if preview_path:
+                        regenerated_count += 1
+                
+                self.logger.info(f"Regenerated {regenerated_count} thumbnails with color mode: {color_mode}")
+                
             except Exception as e:
                 session.rollback()
                 self.logger.error(f"Failed to clear thumbnail_path references: {e}", exc_info=True)
             finally:
                 session.close()
             
-            # Refresh UI to show default logos
+            # Refresh UI to show regenerated thumbnails
             self._load_projects()
             
             # Show success message
@@ -1699,6 +1758,10 @@ class MainWindow(QMainWindow):
             "tempo_asc": "Tempo ↑",
             "length_desc": "Length ↓",
             "length_asc": "Length ↑",
+            "version_desc": "Version ↓",
+            "version_asc": "Version ↑",
+            "key_asc": "Key A-Z",
+            "key_desc": "Key Z-A",
             "location_asc": "Location",
         }
         combo_text = sort_map.get(sort_field)

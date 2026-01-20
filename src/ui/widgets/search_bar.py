@@ -265,8 +265,8 @@ class SearchBar(QWidget):
         self.row2_layout.addWidget(sort_lbl)
         
         self.sort_combo = QComboBox()
-        self.sort_combo.addItems(["Modified ↓", "Modified ↑", "Name A-Z", "Name Z-A", "Tempo ↓", "Tempo ↑", "Length ↓", "Length ↑", "Size ↓", "Size ↑", "Location"])
-        self.sort_combo.setFixedSize(100, h)
+        self.sort_combo.addItems(["Modified ↓", "Modified ↑", "Name A-Z", "Name Z-A", "Tempo ↓", "Tempo ↑", "Length ↓", "Length ↑", "Size ↓", "Size ↑", "Version ↓", "Version ↑", "Key A-Z", "Key Z-A", "Location"])
+        self.sort_combo.setFixedSize(110, h)
         self.sort_combo.currentTextChanged.connect(self._on_sort_changed)
         self.sort_combo.setStyleSheet(f"""
             QComboBox {{
@@ -433,6 +433,8 @@ class SearchBar(QWidget):
             "Tempo ↓": "tempo_desc", "Tempo ↑": "tempo_asc",
             "Length ↓": "length_desc", "Length ↑": "length_asc",
             "Size ↓": "size_desc", "Size ↑": "size_asc",
+            "Version ↓": "version_desc", "Version ↑": "version_asc",
+            "Key A-Z": "key_asc", "Key Z-A": "key_desc",
             "Location": "location_asc"
         }
         self._current_sort = sort_map.get(sort_text, "modified_desc")

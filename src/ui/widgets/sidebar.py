@@ -1,6 +1,8 @@
 """Sidebar navigation widget."""
 
 import os
+import subprocess
+import sys
 from typing import Optional
 from pathlib import Path
 from PyQt6.QtWidgets import (
@@ -11,6 +13,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QUrl
 from PyQt6.QtGui import QFont, QPixmap, QDesktopServices, QMouseEvent
 
 from ...database import get_session, Location, Collection, Tag
+from ...utils.logging import get_logger
 from ..theme import AbletonTheme
 
 
@@ -199,6 +202,7 @@ class Sidebar(QWidget):
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         
+        self.logger = get_logger(__name__)
         self._current_item: Optional[SidebarItem] = None
         self._nav_items: dict = {}
         self._live_version_items: list = []
@@ -391,8 +395,6 @@ class Sidebar(QWidget):
         discord_link.setCheckable(False)  # Don't toggle, just click
         # Try to launch Discord app first, fallback to web
         def _launch_discord():
-            import subprocess
-            import sys
             # Try discord:// protocol first (launches Discord app)
             discord_url = QUrl("discord://discord.gg/ableton")
             if not QDesktopServices.openUrl(discord_url):
@@ -777,9 +779,7 @@ class Sidebar(QWidget):
             finally:
                 session.close()
         except Exception as e:
-            print(f"[SIDEBAR] ERROR: Failed to load Live installations: {e}")
-            import traceback
-            traceback.print_exc()
+            self.logger.error(f"Failed to load Live installations: {e}", exc_info=True)
             error_item = SidebarItem("Error loading Live installations", "⚠️")
             error_item.setEnabled(False)
             self.live_versions_layout.addWidget(error_item)
@@ -789,9 +789,6 @@ class Sidebar(QWidget):
         """Show context menu for a Live installation item."""
         from ...database import get_session, LiveInstallation
         from PyQt6.QtGui import QCursor
-        import sys
-        import os
-        import subprocess
         
         session = get_session()
         try:
@@ -849,8 +846,6 @@ class Sidebar(QWidget):
     
     def _get_prefs_folder(self, version: str) -> Optional[Path]:
         """Get the preferences folder path for a Live version."""
-        import sys
-        
         # Extract major.minor version (e.g., "11.3" from "11.3.13")
         version_parts = version.split('.')
         if len(version_parts) >= 2:
@@ -873,8 +868,6 @@ class Sidebar(QWidget):
     
     def _open_prefs_folder(self, version: str) -> None:
         """Open the preferences folder for a Live version."""
-        import sys
-        import subprocess
         from PyQt6.QtWidgets import QMessageBox
         
         prefs_path = self._get_prefs_folder(version)
@@ -905,8 +898,6 @@ class Sidebar(QWidget):
     
     def _edit_options_txt(self, version: str) -> None:
         """Edit or create Options.txt for a Live version."""
-        import sys
-        import subprocess
         from PyQt6.QtWidgets import QMessageBox, QInputDialog
         
         prefs_path = self._get_prefs_folder(version)
@@ -1013,8 +1004,6 @@ class Sidebar(QWidget):
         """Launch a specific Live installation."""
         try:
             from pathlib import Path
-            import subprocess
-            import sys
             
             exe_path = Path(install.executable_path)
             if not exe_path.exists():
@@ -1035,11 +1024,9 @@ class Sidebar(QWidget):
                 subprocess.Popen(["open", str(app_path)])
             else:
                 subprocess.Popen([str(exe_path)], cwd=exe_path.parent)
-            print(f"[SIDEBAR] Launched {install.name}")
+            self.logger.info(f"Launched {install.name}")
         except Exception as e:
-            print(f"[SIDEBAR] ERROR: Failed to launch {install.name}: {e}")
-            import traceback
-            traceback.print_exc()
+            self.logger.error(f"Failed to launch {install.name}: {e}", exc_info=True)
     
     # === Packs Methods ===
     
@@ -1065,7 +1052,6 @@ class Sidebar(QWidget):
             # Navigate to Resources folder
             # Windows: C:\ProgramData\Ableton\Live XX\Resources
             # macOS: /Applications/Ableton Live XX.app/Contents/App-Resources
-            import sys
             if sys.platform == "win32":
                 # Try ProgramData location first
                 version_parts = install.version.split('.')
@@ -1087,8 +1073,6 @@ class Sidebar(QWidget):
     
     def _open_core_library(self) -> None:
         """Open the Ableton Core Library folder."""
-        import subprocess
-        import sys
         from PyQt6.QtWidgets import QMessageBox
         
         resources = self._get_live_resources_path()
@@ -1115,8 +1099,6 @@ class Sidebar(QWidget):
     
     def _open_user_library(self) -> None:
         """Open the User Library folder."""
-        import subprocess
-        import sys
         from PyQt6.QtWidgets import QMessageBox
         
         # Default user library locations
@@ -1148,8 +1130,6 @@ class Sidebar(QWidget):
     
     def _open_factory_packs(self) -> None:
         """Open the Factory Packs folder."""
-        import subprocess
-        import sys
         from PyQt6.QtWidgets import QMessageBox
         
         # Default factory packs location
@@ -1183,8 +1163,6 @@ class Sidebar(QWidget):
     
     def _open_live_lessons(self) -> None:
         """Open the Ableton Live built-in lessons folder."""
-        import subprocess
-        import sys
         from PyQt6.QtWidgets import QMessageBox
         
         resources = self._get_live_resources_path()
@@ -1214,8 +1192,6 @@ class Sidebar(QWidget):
     
     def _open_lessons_toc(self) -> None:
         """Open the lessons table of contents / index."""
-        import subprocess
-        import sys
         from PyQt6.QtWidgets import QMessageBox
         
         resources = self._get_live_resources_path()
@@ -1460,8 +1436,6 @@ class Sidebar(QWidget):
     
     def _on_open_backup_folder(self) -> None:
         """Open the backup folder in file manager."""
-        import sys
-        import subprocess
         from PyQt6.QtWidgets import QMessageBox
         from ...database import get_session, AppSettings
         
