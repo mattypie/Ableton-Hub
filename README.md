@@ -199,6 +199,107 @@ Built with Python (programming language) and PyQt6 (GUI framework), Ableton Hub 
   - Regional user groups (Austin, Chicago, San Francisco)
   - Ableton Discord community
 
+## 🏗️ System Architecture
+
+> If viewing on mobile, expand the "View Diagram (Mobile)" section below for an image version.
+
+```mermaid
+graph TB
+    subgraph ui["UI Layer - PyQt6"]
+        MainWindow["Main Window"]
+        Sidebar["Sidebar Navigation"]
+        ProjectGrid["Project Grid/List View"]
+        SearchBar["Search & Filter Bar"]
+        CollectionView["Collection View"]
+        HealthDashboard["Health Dashboard"]
+    end
+    
+    subgraph services["Service Layer"]
+        Scanner["Project Scanner"]
+        Watcher["File System Watcher"]
+        ALSParser["ALS Parser"]
+        LiveDetector["Live Version Detector"]
+        LiveLauncher["Live Launcher"]
+        LinkScanner["Link Network Scanner"]
+        ExportTracker["Export Tracker"]
+        SmartCollections["Smart Collections"]
+        DuplicateDetector["Duplicate Detector"]
+        HealthCalculator["Health Calculator"]
+        SimilarityAnalyzer["Similarity Analyzer"]
+        RecommendationEngine["Recommendation Engine"]
+        AudioPlayer["Audio Player"]
+        ArchiveService["Archive Service"]
+    end
+    
+    subgraph storage["Data Storage"]
+        SQLite[("SQLite Database with FTS5")]
+        Config["Configuration"]
+        Cache["Thumbnail Cache"]
+    end
+    
+    subgraph external["External Resources"]
+        ProjectFiles[".als Project Files"]
+        ExportedAudio["Exported Audio Files"]
+        LiveInstallations["Ableton Live Installations"]
+        LinkNetwork["Ableton Link Network"]
+    end
+    
+    MainWindow --> Sidebar
+    MainWindow --> ProjectGrid
+    MainWindow --> SearchBar
+    MainWindow --> CollectionView
+    MainWindow --> HealthDashboard
+    
+    Sidebar --> Scanner
+    ProjectGrid --> SQLite
+    SearchBar --> SQLite
+    CollectionView --> SmartCollections
+    HealthDashboard --> HealthCalculator
+    MainWindow --> SimilarityAnalyzer
+    MainWindow --> RecommendationEngine
+    
+    Scanner --> ALSParser
+    Scanner --> ProjectFiles
+    Scanner --> SQLite
+    Watcher --> ProjectFiles
+    Watcher --> SQLite
+    ALSParser --> ProjectFiles
+    
+    LiveDetector --> LiveInstallations
+    LiveLauncher --> LiveInstallations
+    LiveLauncher --> ProjectFiles
+    
+    LinkScanner --> LinkNetwork
+    
+    ExportTracker --> ExportedAudio
+    ExportTracker --> SQLite
+    
+    SmartCollections --> SQLite
+    SmartCollections --> SimilarityAnalyzer
+    DuplicateDetector --> SQLite
+    HealthCalculator --> SQLite
+    SimilarityAnalyzer --> SQLite
+    RecommendationEngine --> SimilarityAnalyzer
+    RecommendationEngine --> SQLite
+    AudioPlayer --> ExportedAudio
+    ArchiveService --> ProjectFiles
+    ArchiveService --> SQLite
+    
+    MainWindow --> Config
+    ProjectGrid --> Cache
+```
+
+<details>
+<summary><strong>View Diagram (Mobile)</strong></summary>
+
+If the Mermaid diagram above doesn't render (e.g., on GitHub mobile app), view the architecture diagram below:
+
+<div align="center">
+  <img src="resources/images/system-diagram.png" alt="Ableton Hub System Architecture Diagram" width="100%"/>
+</div>
+
+</details>
+
 ## 📋 Requirements
 
 - **Python** (programming language): Version 3.11 or higher
@@ -406,7 +507,10 @@ Contributions are welcome! Please see the **[Contributing Guide](CONTRIBUTING.md
 - Pull request process
 
 
+
 ## 🔮 Roadmap
+- **[Feature Development Status](docs/FEATURE_DEVELOPMENT.md)** - What's implemented and what's planned
+- **[Planned Features Roadmap](docs/PLANNED_FEATURES.plan)** - Detailed implementation plans for future features
 
 ### Recently Completed
 - ✅ **Project Similarity & Discovery** - Find similar projects using Jaccard similarity algorithm and multi-metric analysis
@@ -442,7 +546,8 @@ Contributions are welcome! Please see the **[Contributing Guide](CONTRIBUTING.md
 - **Statistics Dashboard**: Comprehensive analytics with charts and exportable reports
 - Cloud sync integration
 
-See **[Feature Development](docs/FEATURE_DEVELOPMENT.md)** for full details on completed and planned features.
+
+
 
 
 ## 📝 License
@@ -453,6 +558,9 @@ MIT License - see LICENSE file for details.
 
 **Tom Carlile**  
 Email: carlile.tom@gmail.com
+
+Ableton Certified Trainer and Austin Ableton User Group Organizer 
+https://www.ableton.com/en/certified-training/tom-carlile/
 
 ## ⚠️ Disclaimer
 
@@ -465,14 +573,8 @@ This application is an independent, open-source project and is **not affiliated 
 - Uses [SQLAlchemy](https://www.sqlalchemy.org/) for database management
 - [Ableton](https://www.ableton.com/) for creating amazing music production software
 
-## 📋 Project Documentation
 
-- **[Feature Development Status](docs/FEATURE_DEVELOPMENT.md)** - What's implemented and what's planned
-- **[Planned Features Roadmap](docs/PLANNED_FEATURES.plan)** - Detailed implementation plans for future features
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 
-## 📞 Support
 
-For issues, questions, or feature requests, please open an issue on GitHub.
 
 
