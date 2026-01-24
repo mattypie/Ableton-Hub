@@ -248,8 +248,8 @@ class MainWindow(QMainWindow):
             if logo_path.exists():
                 logo_label = QLabel()
                 pixmap = QPixmap(str(logo_path))
-                # Scale logo to reasonable size (max height 32px for toolbar)
-                scaled_pixmap = pixmap.scaledToHeight(32, Qt.TransformationMode.SmoothTransformation)
+                # Scale logo to reasonable size (max height 40px for toolbar)
+                scaled_pixmap = pixmap.scaledToHeight(40, Qt.TransformationMode.SmoothTransformation)
                 logo_label.setPixmap(scaled_pixmap)
                 logo_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
                 logo_label.setStyleSheet("padding: 4px;")

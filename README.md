@@ -78,18 +78,24 @@ Built with Python (programming language) and PyQt6 (GUI framework), Ableton Hub 
   - **Multi-Metric Comparison**: Combines plugin similarity, device similarity, tempo proximity, structural similarity, and feature vector analysis
   - **Weighted Scoring**: Overall similarity score (0-100%) with detailed breakdowns
 - **Multiple Discovery Methods**:
-  - **Project Details Dialog**: View similar projects directly in project properties
-  - **Context Menu**: Right-click any project to "Find Similar Projects"
-  - **Recommendations Panel**: Dedicated sidebar panel showing similar projects and recommendations
-  - **Smart Collections**: Filter collections by similarity to a reference project
-  - **Visual Indicators**: Similarity badges on project cards when similar projects exist
+  - **Similarity Indicator**: Projects with similar projects display a 🔗 icon in the bottom-right corner of project cards - hover to see tooltip, right-click to find similar projects
+  - **Context Menu**: Right-click any project → "Find Similar Projects" to open a dialog showing up to 20 similar projects with similarity scores and explanations
+  - **Project Details Dialog**: View similar projects directly in project properties with detailed similarity breakdowns
+  - **Recommendations Panel**: Dedicated sidebar panel showing similar projects and recommendations based on the currently selected project
+  - **Smart Collections**: Create dynamic collections filtered by similarity to a reference project (with configurable similarity threshold)
+- **How to Use**:
+  1. **Find Similar Projects from a Card**: Right-click any project card with a 🔗 similarity indicator → "Find Similar Projects"
+  2. **Search First, Then Find Similar**: Use the search bar to find a project, then right-click it to find similar projects
+  3. **View in Project Details**: Double-click any project to open details, then view the "Similar Projects" tab
+  4. **Browse Recommendations**: Select a project to see recommendations in the sidebar Recommendations panel
+  5. **Create Similarity-Based Collections**: Use Smart Collections with a similarity filter rule
 - **Similarity Metrics**:
   - Plugin overlap (Jaccard similarity on plugin sets)
   - Device overlap (Jaccard similarity on device sets)
   - Tempo proximity (±5 BPM tolerance)
   - Structural similarity (track counts, arrangement length)
   - Feature vector cosine similarity
-- **Detailed Explanations**: Tooltips and explanations show why projects are similar (shared plugins, devices, tempo, etc.)
+- **Detailed Explanations**: Tooltips and explanations show why projects are similar (shared plugins, devices, tempo, etc.) with similarity scores displayed as percentages
 
 #### Location Management
 - **Multiple Location Types**:
