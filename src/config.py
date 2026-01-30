@@ -64,7 +64,7 @@ class UIConfig:
     show_status_bar: bool = True
     confirm_delete: bool = True
     date_format: str = "%Y-%m-%d %H:%M"
-    waveform_color_mode: str = "rainbow"  # Gradient modes only: "rainbow", "random", or gradient options (solid colors disabled)
+    waveform_color_mode: str = "random"  # Gradient modes only: "rainbow", "random", or gradient options (solid colors disabled)
 
 
 @dataclass
@@ -76,7 +76,7 @@ class Config:
     link: LinkConfig = field(default_factory=LinkConfig)
     ui: UIConfig = field(default_factory=UIConfig)
     first_run: bool = True
-    version: str = "0.1.0"
+    version: str = "1.0.0"
 
 
 class ConfigManager:
@@ -172,7 +172,7 @@ class ConfigManager:
             link=LinkConfig(**data.get('link', {})),
             ui=UIConfig(**data.get('ui', {})),
             first_run=data.get('first_run', True),
-            version=data.get('version', '0.1.0'),
+            version=data.get('version', '1.0.0'),
         )
 
 
