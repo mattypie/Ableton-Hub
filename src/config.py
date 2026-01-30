@@ -49,7 +49,7 @@ class ExportConfig:
 @dataclass
 class LinkConfig:
     """Ableton Link configuration."""
-    enabled: bool = True
+    enabled: bool = False
     scan_interval_seconds: int = 5
     show_offline_devices: bool = True
     device_history_days: int = 30

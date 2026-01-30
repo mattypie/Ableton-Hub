@@ -1532,9 +1532,9 @@ class MainWindow(QMainWindow):
         elif view == "health":
             self.content_stack.setCurrentIndex(4)
             self.health_dashboard.refresh()
-        elif view == "recommendations":
+        elif view == "similarities":
             self.content_stack.setCurrentIndex(5)
-            # If a project is selected, set it in recommendations panel
+            # If a project is selected, set it in similarities panel
             selected_ids = self.project_grid.get_selected_ids()
             if selected_ids and len(selected_ids) == 1:
                 self.recommendations_panel.set_project(selected_ids[0])

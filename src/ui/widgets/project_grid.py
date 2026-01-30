@@ -477,6 +477,11 @@ class ProjectGrid(QWidget):
         """Show dialog with similar projects."""
         from ..dialogs.similar_projects_dialog import SimilarProjectsDialog
         dialog = SimilarProjectsDialog(project_id, self)
+        
+        # Connect signal to open project properties in main window
+        if hasattr(self, '_main_window') and self._main_window:
+            dialog.project_selected.connect(self._main_window.show_project_properties)
+        
         dialog.exec()
     
     def _show_properties(self, project_id: int) -> None:

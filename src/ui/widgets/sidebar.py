@@ -249,6 +249,11 @@ class Sidebar(QWidget):
         self._nav_items["recent"] = recent
         nav_section.add_item(recent)
         
+        similarities = SidebarItem("Similarities", "🔗")
+        similarities.clicked.connect(lambda: self._on_nav_click("similarities"))
+        self._nav_items["similarities"] = similarities
+        nav_section.add_item(similarities)
+        
         favorites = SidebarItem("Favorites", "💎")
         favorites.clicked.connect(lambda: self._on_nav_click("favorites"))
         self._nav_items["favorites"] = favorites
@@ -598,11 +603,6 @@ class Sidebar(QWidget):
         health_item.clicked.connect(lambda: self._on_nav_click("health"))
         self._nav_items["health"] = health_item
         bottom_links_layout.addWidget(health_item)
-        
-        recommendations_item = SidebarItem("Recommendations", "💡")
-        recommendations_item.clicked.connect(lambda: self._on_nav_click("recommendations"))
-        self._nav_items["recommendations"] = recommendations_item
-        bottom_links_layout.addWidget(recommendations_item)
         
         content_layout.addWidget(bottom_links_container)
         

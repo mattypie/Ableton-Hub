@@ -224,7 +224,5 @@ class SimilarProjectsDialog(QDialog):
         project_id = item.data(Qt.ItemDataRole.UserRole)
         if project_id:
             self.project_selected.emit(project_id)
-            # Open project details dialog
-            from .project_details import ProjectDetailsDialog
-            dialog = ProjectDetailsDialog(project_id, self)
-            dialog.exec()
+            # Close this dialog - main window will handle navigation
+            self.accept()

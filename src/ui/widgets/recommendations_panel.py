@@ -1,9 +1,10 @@
-"""Recommendations panel widget showing similar projects and recommendations."""
+"""Similarities panel widget showing similar projects based on analysis."""
 
-from typing import Optional
+from typing import Optional, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QGroupBox, QProgressBar, QMessageBox
+    QListWidget, QListWidgetItem, QGroupBox, QProgressBar, QMessageBox,
+    QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -35,7 +36,7 @@ class RecommendationsPanel(QWidget):
         
         # Header
         header = QHBoxLayout()
-        title = QLabel("Recommendations")
+        title = QLabel("Similarities")
         title.setStyleSheet("font-size: 20px; font-weight: bold;")
         header.addWidget(title)
         
@@ -47,26 +48,78 @@ class RecommendationsPanel(QWidget):
         
         layout.addLayout(header)
         
-        # Info label
-        self.info_label = QLabel("Select a project to see similar projects and recommendations")
-        self.info_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 12px;")
-        self.info_label.setWordWrap(True)
-        layout.addWidget(self.info_label)
+        # Explanation section
+        explanation_group = QGroupBox("How Project Similarity Works")
+        explanation_group.setStyleSheet(f"""
+            QGroupBox {{
+                font-weight: bold;
+                border: 1px solid {AbletonTheme.COLORS['border']};
+                border-radius: 4px;
+                margin-top: 8px;
+                padding-top: 8px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }}
+        """)
+        explanation_layout = QVBoxLayout(explanation_group)
+        explanation_layout.setSpacing(8)
         
-        # Current project display
-        self.current_project_group = QGroupBox("Current Project")
-        current_layout = QVBoxLayout(self.current_project_group)
+        similar_explanation = QLabel(
+            "<b>Similar Projects</b> uses <i>Jaccard set similarity</i> to compare projects:<br>"
+            "• <b>Plugins</b> (20%): Shared VST/AU plugins (e.g., both use Serum, FabFilter Pro-Q)<br>"
+            "• <b>Devices</b> (15%): Shared Ableton devices (e.g., both use Wavetable, Compressor)<br>"
+            "• <b>Tempo</b> (15%): How close the BPM values are<br>"
+            "• <b>Structure</b> (15%): Track counts, clips, arrangement length<br>"
+            "• <b>Features</b> (35%): Cosine similarity of extracted feature vectors"
+        )
+        similar_explanation.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 11px;")
+        similar_explanation.setWordWrap(True)
+        explanation_layout.addWidget(similar_explanation)
         
-        self.current_project_label = QLabel("No project selected")
-        self.current_project_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        current_layout.addWidget(self.current_project_label)
+        jaccard_explanation = QLabel(
+            "<b>Jaccard Formula:</b> |A ∩ B| / |A ∪ B|<br>"
+            "Example: Project A uses [Serum, Massive, Pro-Q], Project B uses [Serum, Pro-Q, Ozone]<br>"
+            "→ Intersection = 2 (Serum, Pro-Q), Union = 4 → Jaccard = 2/4 = 50%"
+        )
+        jaccard_explanation.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 11px;")
+        jaccard_explanation.setWordWrap(True)
+        explanation_layout.addWidget(jaccard_explanation)
         
-        select_btn = QPushButton("Select Project...")
-        select_btn.clicked.connect(self._select_project)
-        current_layout.addWidget(select_btn)
+        ml_explanation = QLabel(
+            "<b>ML-Based Matches</b> uses content-based filtering:<br>"
+            "• <b>Plugin co-occurrence</b>: Projects using similar plugin combinations<br>"
+            "• <b>Device patterns</b>: Common device chain patterns<br>"
+            "• <b>Tempo affinity</b>: Plugins commonly used at similar tempos<br>"
+            "Example: If you often use Serum + OTT together, projects with both score higher"
+        )
+        ml_explanation.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 11px;")
+        ml_explanation.setWordWrap(True)
+        explanation_layout.addWidget(ml_explanation)
         
-        self.current_project_group.setVisible(False)
-        layout.addWidget(self.current_project_group)
+        layout.addWidget(explanation_group)
+        
+        # Project selector
+        selector_layout = QHBoxLayout()
+        
+        selector_label = QLabel("Compare Project:")
+        selector_label.setStyleSheet("font-weight: bold;")
+        selector_layout.addWidget(selector_label)
+        
+        self.project_combo = QComboBox()
+        self.project_combo.setMinimumWidth(300)
+        self.project_combo.currentIndexChanged.connect(self._on_project_combo_changed)
+        selector_layout.addWidget(self.project_combo)
+        
+        selector_layout.addStretch()
+        
+        layout.addLayout(selector_layout)
+        
+        # Populate combo box
+        self._project_id_map: Dict[int, int] = {}  # combo index -> project id
+        self._populate_project_combo()
         
         # Similar projects group
         similar_group = QGroupBox("Similar Projects")
@@ -82,8 +135,8 @@ class RecommendationsPanel(QWidget):
         
         layout.addWidget(similar_group)
         
-        # Recommendations group
-        recommendations_group = QGroupBox("Recommendations")
+        # ML-Based Matches group
+        recommendations_group = QGroupBox("ML-Based Matches")
         recommendations_layout = QVBoxLayout(recommendations_group)
         
         self.recommendations_list = QListWidget()
@@ -97,53 +150,69 @@ class RecommendationsPanel(QWidget):
     def set_project(self, project_id: int) -> None:
         """Set the current project and load recommendations."""
         self._current_project_id = project_id
-        self._update_current_project_display()
+        self._select_combo_by_project_id(project_id)
         self._refresh_recommendations()
     
-    def _select_project(self) -> None:
-        """Show dialog to select a project."""
-        from PyQt6.QtWidgets import QInputDialog
+    def _populate_project_combo(self) -> None:
+        """Populate the project combo box with all projects."""
+        # Block signals to prevent triggering change event during population
+        self.project_combo.blockSignals(True)
+        
+        current_project_id = self._current_project_id
+        self.project_combo.clear()
+        self._project_id_map.clear()
+        
+        # Add placeholder
+        self.project_combo.addItem("-- Select a project --")
+        self._project_id_map[0] = None
         
         session = get_session()
         try:
             projects = session.query(Project).order_by(Project.name).all()
             
-            if not projects:
-                QMessageBox.information(self, "No Projects", "No projects found.")
-                return
+            selected_index = 0
+            for idx, project in enumerate(projects, start=1):
+                display_name = project.name
+                if project.location:
+                    display_name = f"{project.name} ({project.location.name})"
+                
+                self.project_combo.addItem(display_name)
+                self._project_id_map[idx] = project.id
+                
+                # Check if this was the previously selected project
+                if project.id == current_project_id:
+                    selected_index = idx
             
-            project_names = [p.name for p in projects]
-            name, ok = QInputDialog.getItem(
-                self,
-                "Select Project",
-                "Choose a project to see recommendations:",
-                project_names,
-                editable=False
-            )
-            
-            if ok and name:
-                project = next((p for p in projects if p.name == name), None)
-                if project:
-                    self.set_project(project.id)
+            # Restore selection
+            if selected_index > 0:
+                self.project_combo.setCurrentIndex(selected_index)
+                
         finally:
             session.close()
-    
-    def _update_current_project_display(self) -> None:
-        """Update the current project display."""
-        if not self._current_project_id:
-            self.current_project_group.setVisible(False)
-            return
         
-        session = get_session()
-        try:
-            project = session.query(Project).get(self._current_project_id)
-            if project:
-                self.current_project_label.setText(f"📁 {project.name}")
-                self.current_project_group.setVisible(True)
-            else:
-                self.current_project_group.setVisible(False)
-        finally:
-            session.close()
+        self.project_combo.blockSignals(False)
+    
+    def _on_project_combo_changed(self, index: int) -> None:
+        """Handle project combo box selection change."""
+        project_id = self._project_id_map.get(index)
+        if project_id is not None:
+            self._current_project_id = project_id
+            self._refresh_recommendations()
+        else:
+            # Placeholder selected - clear results
+            self._current_project_id = None
+            self.similar_list.clear()
+            self.recommendations_list.clear()
+            self.similar_list.addItem(QListWidgetItem("Select a project to see similar projects"))
+    
+    def _select_combo_by_project_id(self, project_id: int) -> None:
+        """Select the combo box item matching the given project ID."""
+        for index, pid in self._project_id_map.items():
+            if pid == project_id:
+                self.project_combo.blockSignals(True)
+                self.project_combo.setCurrentIndex(index)
+                self.project_combo.blockSignals(False)
+                return
     
     def _refresh_recommendations(self) -> None:
         """Refresh recommendations for the current project."""
