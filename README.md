@@ -222,6 +222,8 @@ graph TB
         ProjectGrid["Project Grid/List View"]
         SearchBar["Search & Filter Bar"]
         CollectionView["Collection View"]
+        ProjectPropertiesView["Project Properties View"]
+        SimilaritiesPanel["Similarities Panel"]
         HealthDashboard["Health Dashboard"]
     end
     
@@ -259,15 +261,19 @@ graph TB
     MainWindow --> ProjectGrid
     MainWindow --> SearchBar
     MainWindow --> CollectionView
+    MainWindow --> ProjectPropertiesView
+    MainWindow --> SimilaritiesPanel
     MainWindow --> HealthDashboard
     
     Sidebar --> Scanner
     ProjectGrid --> SQLite
     SearchBar --> SQLite
     CollectionView --> SmartCollections
+    ProjectPropertiesView --> SQLite
+    ProjectPropertiesView --> ALSParser
+    SimilaritiesPanel --> SimilarityAnalyzer
+    SimilaritiesPanel --> RecommendationEngine
     HealthDashboard --> HealthCalculator
-    MainWindow --> SimilarityAnalyzer
-    MainWindow --> RecommendationEngine
     
     Scanner --> ALSParser
     Scanner --> ProjectFiles
