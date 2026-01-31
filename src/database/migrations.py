@@ -323,6 +323,38 @@ def migration_add_musical_key_fields(engine: Engine) -> None:
         conn.commit()
 
 
+def migration_add_export_id_to_project_collections(engine: Engine) -> None:
+    """Add export_id column to project_collections table."""
+    with engine.connect() as conn:
+        # Check if export_id column already exists
+        result = conn.execute(text(
+            "PRAGMA table_info(project_collections)"
+        ))
+        columns = [row[1] for row in result.fetchall()]
+        
+        if 'export_id' not in columns:
+            conn.execute(text(
+                "ALTER TABLE project_collections ADD COLUMN export_id INTEGER REFERENCES exports(id)"
+            ))
+            conn.commit()
+
+
+def migration_add_artist_name_to_collections(engine: Engine) -> None:
+    """Add artist_name column to collections table."""
+    with engine.connect() as conn:
+        # Check if artist_name column already exists
+        result = conn.execute(text(
+            "PRAGMA table_info(collections)"
+        ))
+        columns = [row[1] for row in result.fetchall()]
+        
+        if 'artist_name' not in columns:
+            conn.execute(text(
+                "ALTER TABLE collections ADD COLUMN artist_name VARCHAR(255)"
+            ))
+            conn.commit()
+
+
 # Migration registry - add new migrations here
 # Each migration is a tuple of (version, description, function)
 # NOTE: Must be defined AFTER the migration functions
@@ -335,6 +367,8 @@ MIGRATIONS: List[tuple] = [
     (6, "Add live_installations table for storing Live installations", migration_add_live_installations),
     (7, "Add arrangement_duration_seconds for calculated time duration", migration_add_arrangement_duration),
     (8, "Add musical_key, scale_type, is_in_key fields to projects", migration_add_musical_key_fields),
+    (9, "Add export_id to project_collections for export selection", migration_add_export_id_to_project_collections),
+    (10, "Add artist_name to collections", migration_add_artist_name_to_collections),
 ]
 
 

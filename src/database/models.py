@@ -95,6 +95,7 @@ class Collection(Base):
     
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
+    artist_name = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
     collection_type = Column(SQLEnum(CollectionType), default=CollectionType.ALBUM)
     artwork_path = Column(String(1024), nullable=True)
@@ -281,11 +282,13 @@ class ProjectCollection(Base):
     is_bonus = Column(Boolean, default=False)
     track_name = Column(String(255), nullable=True)  # Track name specific to this collection
     track_artwork_path = Column(String(1024), nullable=True)  # Artwork for this track
+    export_id = Column(Integer, ForeignKey("exports.id"), nullable=True)  # Selected export for track name
     created_date = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     project = relationship("Project", back_populates="project_collections")
     collection = relationship("Collection", back_populates="project_collections")
+    export = relationship("Export", back_populates="project_collections")
     
     __table_args__ = (
         UniqueConstraint('project_id', 'collection_id', name='unique_project_collection'),
@@ -317,6 +320,7 @@ class Export(Base):
     
     # Relationships
     project = relationship("Project", back_populates="exports")
+    project_collections = relationship("ProjectCollection", back_populates="export")
     
     def __repr__(self) -> str:
         return f"<Export(id={self.id}, name='{self.export_name}', project_id={self.project_id})>"

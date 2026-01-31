@@ -5,13 +5,13 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QScrollArea, QFrame, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QHeaderView, QAbstractItemView, QMenu, QMessageBox, QFileDialog
+    QHeaderView, QAbstractItemView, QMenu, QMessageBox, QFileDialog, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
-from PyQt6.QtGui import QPixmap, QIcon
+from PyQt6.QtGui import QPixmap, QIcon, QFont
 
 from ...database import get_session, Collection, CollectionType, ProjectCollection, Project
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from ..theme import AbletonTheme
 
 
@@ -226,17 +226,30 @@ class CollectionDetailView(QWidget):
         # Details
         details = QVBoxLayout()
         
+        # Artist name (if available)
+        self.artist_label = QLabel()
+        self.artist_label.setStyleSheet(f"font-size: 18px; color: {AbletonTheme.COLORS['text_secondary']};")
+        details.addWidget(self.artist_label)
+        
+        # Collection name
         self.name_label = QLabel()
         self.name_label.setStyleSheet(f"font-size: 24px; font-weight: bold;")
         details.addWidget(self.name_label)
         
+        # Type and release date
         self.type_label = QLabel()
         self.type_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']};")
         details.addWidget(self.type_label)
         
+        # Release date (full date if available)
+        self.release_date_label = QLabel()
+        self.release_date_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']};")
+        details.addWidget(self.release_date_label)
+        
+        # Description
         self.description_label = QLabel()
         self.description_label.setWordWrap(True)
-        self.description_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']};")
+        self.description_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; margin-top: 8px;")
         details.addWidget(self.description_label)
         
         details.addStretch()
@@ -253,38 +266,37 @@ class CollectionDetailView(QWidget):
         self.track_table = QTableWidget()
         self.track_table.setColumnCount(6)
         self.track_table.setHorizontalHeaderLabels([
-            "#", "Artwork", "Track Name", "Project File", "Export", "Actions"
+            "#", "Artwork", "Track Name", "Project", "Export", "Actions"
         ])
         self.track_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.track_table.setAlternatingRowColors(True)
         self.track_table.setShowGrid(False)
         self.track_table.verticalHeader().setVisible(False)
         
-        # Enable drag and drop for reordering
-        self.track_table.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
-        self.track_table.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self.track_table.setDragEnabled(True)
-        self.track_table.setAcceptDrops(True)
-        self.track_table.setDropIndicatorShown(True)
+        # Set row height
+        self.track_table.verticalHeader().setDefaultSectionSize(45)
+        
+        # Drag and drop disabled - use Move Up/Down buttons instead
+        self.track_table.setDragDropMode(QAbstractItemView.DragDropMode.NoDragDrop)
         
         # Make track name column editable
         self.track_table.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.SelectedClicked)
         
         header = self.track_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # #
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Artwork
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Track Name
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Project
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Export
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)  # Actions - fixed width
+        
+        # Set Actions column to a wider fixed width
+        header.resizeSection(5, 280)
         
         self.track_table.cellDoubleClicked.connect(self._on_track_double_click)
         self.track_table.cellChanged.connect(self._on_track_name_changed)
         self.track_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.track_table.customContextMenuRequested.connect(self._on_track_context_menu)
-        
-        # Handle drop event for reordering
-        self.track_table.model().rowsMoved.connect(self._on_tracks_reordered)
         
         layout.addWidget(self.track_table)
     
@@ -302,28 +314,79 @@ class CollectionDetailView(QWidget):
         finally:
             session.close()
     
+    def _refresh_collection_from_db(self) -> None:
+        """Refresh collection from database with proper relationships."""
+        if not self._collection:
+            return
+        session = get_session()
+        try:
+            self._collection = session.query(Collection).options(
+                joinedload(Collection.project_collections).joinedload(ProjectCollection.project).joinedload(Project.location),
+                joinedload(Collection.project_collections).joinedload(ProjectCollection.project).selectinload(Project.exports),
+                joinedload(Collection.project_collections).joinedload(ProjectCollection.export)
+            ).get(self._collection.id)
+            
+            # Clean up invalid export_id references (exports that were deleted)
+            if self._collection:
+                from ...database import Export
+                for pc in self._collection.project_collections:
+                    if pc.export_id:
+                        # Check if export still exists
+                        export = session.query(Export).get(pc.export_id)
+                        if not export or export.project_id != pc.project_id:
+                            # Export doesn't exist or belongs to different project, clear it
+                            pc.export_id = None
+                            session.commit()
+        finally:
+            session.close()
+    
     def _update_display(self) -> None:
         """Update the display with collection data."""
         if not self._collection:
             # Show empty state
             self.name_label.setText("Collection not found")
+            self.artist_label.setVisible(False)
             self.type_label.setText("")
-            self.description_label.setText("")
-            self.artwork_label.setText("📁")
+            self.release_date_label.setVisible(False)
+            self.description_label.setVisible(False)
+            self.artwork.setText("📁")
             self.track_table.setRowCount(0)
             return
         
-        # Name
+        # Artist name
+        if self._collection.artist_name:
+            self.artist_label.setText(self._collection.artist_name)
+            self.artist_label.setVisible(True)
+        else:
+            self.artist_label.setVisible(False)
+        
+        # Collection name
         self.name_label.setText(self._collection.name)
         
         # Type
-        self.type_label.setText(
-            f"{self._collection.collection_type.value.title()}"
-            + (f" • {self._collection.release_date.strftime('%Y')}" if self._collection.release_date else "")
-        )
+        self.type_label.setText(f"{self._collection.collection_type.value.title()}")
+        
+        # Release date (full date format)
+        if self._collection.release_date:
+            from datetime import datetime, date
+            release_date = self._collection.release_date
+            if isinstance(release_date, datetime):
+                release_str = release_date.strftime('%B %d, %Y')
+            elif isinstance(release_date, date):
+                release_str = release_date.strftime('%B %d, %Y')
+            else:
+                release_str = str(release_date)
+            self.release_date_label.setText(f"Released: {release_str}")
+            self.release_date_label.setVisible(True)
+        else:
+            self.release_date_label.setVisible(False)
         
         # Description
-        self.description_label.setText(self._collection.description or "")
+        if self._collection.description:
+            self.description_label.setText(self._collection.description)
+            self.description_label.setVisible(True)
+        else:
+            self.description_label.setVisible(False)
         
         # Artwork
         if self._collection.artwork_path:
@@ -363,9 +426,20 @@ class CollectionDetailView(QWidget):
         if not self._collection:
             return
         
-        # Disconnect cellChanged to prevent triggering during population
-        self.track_table.cellChanged.disconnect()
+        # Refresh collection to ensure we have fresh data
+        self._refresh_collection_from_db()
         
+        if not self._collection:
+            return
+        
+        # Disconnect cellChanged to prevent triggering during population
+        try:
+            self.track_table.cellChanged.disconnect()
+        except TypeError:
+            # Already disconnected or never connected
+            pass
+        
+        # Ensure we're working with fresh project_collections
         pcs = sorted(
             self._collection.project_collections,
             key=lambda x: (x.disc_number or 1, x.track_number or 999)
@@ -394,15 +468,38 @@ class CollectionDetailView(QWidget):
             artwork_item.setFlags(artwork_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self.track_table.setItem(row, 1, artwork_item)
             
-            # Track name (editable - uses track_name from ProjectCollection, fallback to project name)
+            # Track name (editable - priority: track_name > selected_export.export_name > export_song_name > project.name)
             if pc.project:
-                track_name = pc.track_name or pc.project.export_song_name or pc.project.name
+                if pc.track_name:
+                    track_name = pc.track_name
+                elif pc.export_id:
+                    # Check if export still exists
+                    try:
+                        if pc.export and pc.export.export_name:
+                            track_name = pc.export.export_name
+                        else:
+                            # Export was deleted, fall back (don't modify DB here, just display)
+                            if pc.project.export_song_name:
+                                track_name = pc.project.export_song_name
+                            else:
+                                track_name = pc.project.name
+                    except Exception:
+                        # Export relationship issue, fall back
+                        if pc.project.export_song_name:
+                            track_name = pc.project.export_song_name
+                        else:
+                            track_name = pc.project.name
+                elif pc.project.export_song_name:
+                    track_name = pc.project.export_song_name
+                else:
+                    track_name = pc.project.name
+                
                 name_item = QTableWidgetItem(track_name)
                 name_item.setData(Qt.ItemDataRole.UserRole, pc.id)  # Store ProjectCollection ID
                 name_item.setFlags(name_item.flags() | Qt.ItemFlag.ItemIsEditable)
                 self.track_table.setItem(row, 2, name_item)
                 
-                # Project file
+                # Project
                 project_item = QTableWidgetItem(pc.project.name)
                 project_item.setData(Qt.ItemDataRole.UserRole, pc.project.id)
                 project_item.setFlags(project_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -426,18 +523,91 @@ class CollectionDetailView(QWidget):
             # Actions column with buttons
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
-            actions_layout.setContentsMargins(4, 2, 4, 2)
-            actions_layout.setSpacing(4)
+            actions_layout.setContentsMargins(0, 0, 0, 0)
+            actions_layout.setSpacing(6)
+            actions_layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # Align buttons to top
+            actions_layout.addStretch()  # Push buttons to the right
             
+            # Export selection button (first button, before other actions)
+            export_select_btn = QPushButton("🎞️")
+            export_select_btn.setFixedSize(40, 40)
+            export_select_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            font = QFont()
+            font.setPointSize(24)
+            export_select_btn.setFont(font)
+            export_select_btn.setStyleSheet("QPushButton { padding: 0px; margin: 0px; border: none; text-align: center; padding-top: 0px; padding-bottom: 0px; }")
+            export_select_btn.setToolTip('<div style="font-size: 10px;">Select export for track name</div>')
+            # Check if project has exports
+            has_exports = False
+            try:
+                if pc.project:
+                    # Check if exports are loaded in the relationship
+                    if hasattr(pc.project, 'exports'):
+                        has_exports = bool(pc.project.exports)
+                    else:
+                        # If not loaded, query from database
+                        from ...database import get_session, Export
+                        temp_session = get_session()
+                        try:
+                            export_count = temp_session.query(Export).filter(
+                                Export.project_id == pc.project.id
+                            ).count()
+                            has_exports = export_count > 0
+                        finally:
+                            temp_session.close()
+            except Exception:
+                pass
+            export_select_btn.setEnabled(has_exports)
+            export_select_btn.clicked.connect(lambda checked, pc_id=pc.id: self._on_select_export(pc_id))
+            actions_layout.addWidget(export_select_btn)
+            
+            # Move up button
+            move_up_btn = QPushButton("↑")
+            move_up_btn.setFixedSize(40, 40)
+            move_up_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            font_up = QFont()
+            font_up.setPointSize(26)
+            move_up_btn.setFont(font_up)
+            move_up_btn.setStyleSheet("QPushButton { padding: 0px; margin: 0px; border: none; text-align: center; padding-top: 0px; padding-bottom: 0px; }")
+            move_up_btn.setToolTip('<div style="font-size: 10px;">Move up</div>')
+            move_up_btn.setEnabled(row > 0)
+            move_up_btn.clicked.connect(lambda checked, pc_id=pc.id: self._move_track(pc_id, -1))
+            actions_layout.addWidget(move_up_btn)
+            
+            # Move down button
+            move_down_btn = QPushButton("↓")
+            move_down_btn.setFixedSize(40, 40)
+            move_down_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            font_down = QFont()
+            font_down.setPointSize(26)
+            move_down_btn.setFont(font_down)
+            move_down_btn.setStyleSheet("QPushButton { padding: 0px; margin: 0px; border: none; text-align: center; padding-top: 0px; padding-bottom: 0px; }")
+            move_down_btn.setToolTip('<div style="font-size: 10px;">Move down</div>')
+            move_down_btn.setEnabled(row < len(pcs) - 1)
+            move_down_btn.clicked.connect(lambda checked, pc_id=pc.id: self._move_track(pc_id, 1))
+            actions_layout.addWidget(move_down_btn)
+            
+            # Artwork button
             artwork_btn = QPushButton("🖼️")
-            artwork_btn.setFixedSize(24, 24)
-            artwork_btn.setToolTip("Set track artwork")
+            artwork_btn.setFixedSize(40, 40)
+            artwork_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            font_art = QFont()
+            font_art.setPointSize(24)
+            artwork_btn.setFont(font_art)
+            artwork_btn.setStyleSheet("QPushButton { padding: 0px; margin: 0px; border: none; text-align: center; padding-top: 0px; padding-bottom: 0px; }")
+            artwork_btn.setToolTip('<div style="font-size: 10px;">Set track artwork</div>')
             artwork_btn.clicked.connect(lambda checked, pc_id=pc.id: self._set_track_artwork(pc_id))
             actions_layout.addWidget(artwork_btn)
             
+            # Remove button
             remove_btn = QPushButton("✕")
-            remove_btn.setFixedSize(24, 24)
-            remove_btn.setToolTip("Remove from collection")
+            remove_btn.setFixedSize(40, 40)
+            remove_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            font_remove = QFont()
+            font_remove.setPointSize(26)
+            remove_btn.setFont(font_remove)
+            remove_btn.setStyleSheet("QPushButton { padding: 0px; margin: 0px; border: none; text-align: center; padding-top: 0px; padding-bottom: 0px; }")
+            remove_btn.setToolTip('<div style="font-size: 10px;">Remove from collection</div>')
             remove_btn.clicked.connect(lambda checked, pc_id=pc.id: self._remove_track(pc_id))
             actions_layout.addWidget(remove_btn)
             
@@ -448,7 +618,7 @@ class CollectionDetailView(QWidget):
     
     def _on_track_double_click(self, row: int, col: int) -> None:
         """Handle track double click."""
-        if col == 3:  # Project file column
+        if col == 3:  # Project column (renamed from "Project File")
             item = self.track_table.item(row, 3)
             if item:
                 project_id = item.data(Qt.ItemDataRole.UserRole)
@@ -470,7 +640,12 @@ class CollectionDetailView(QWidget):
                 try:
                     pc = session.query(ProjectCollection).get(pc_id)
                     if pc:
-                        pc.track_name = new_name if new_name else None
+                        # If user edits track name, clear export_id to use custom name
+                        if new_name:
+                            pc.track_name = new_name
+                            pc.export_id = None  # Clear export selection when using custom name
+                        else:
+                            pc.track_name = None
                         session.commit()
                 finally:
                     session.close()
@@ -551,17 +726,29 @@ class CollectionDetailView(QWidget):
     
     def _move_track(self, pc_id: int, direction: int) -> None:
         """Move a track up or down in the collection."""
+        # Refresh collection from database to ensure fresh data
+        self._refresh_collection_from_db()
+        
+        if not self._collection:
+            return
+        
         from ...database import get_session, ProjectCollection
         
         session = get_session()
         try:
+            # Query fresh data from database
             pc = session.query(ProjectCollection).get(pc_id)
-            if not pc or not self._collection:
+            if not pc or pc.collection_id != self._collection.id:
                 return
             
-            # Get all tracks sorted
+            # Get all tracks for this collection from database, sorted
+            all_pcs = session.query(ProjectCollection).filter(
+                ProjectCollection.collection_id == self._collection.id
+            ).order_by(ProjectCollection.disc_number, ProjectCollection.track_number).all()
+            
+            # Sort by disc_number and track_number
             all_pcs = sorted(
-                self._collection.project_collections,
+                all_pcs,
                 key=lambda x: (x.disc_number or 1, x.track_number or 999)
             )
             
@@ -582,6 +769,103 @@ class CollectionDetailView(QWidget):
             other_pc.track_number = pc_track
             
             session.commit()
+            
+            # Refresh collection and repopulate table
+            self._refresh_collection_from_db()
+            self._populate_tracks()
+            
+        finally:
+            session.close()
+    
+    def _on_select_export(self, pc_id: int) -> None:
+        """Show menu to select which export to use for track name."""
+        from ...database import get_session, ProjectCollection, Export
+        
+        session = get_session()
+        try:
+            pc = session.query(ProjectCollection).get(pc_id)
+            if not pc or not pc.project:
+                return
+            
+            # Get all exports for this project
+            exports = session.query(Export).filter(
+                Export.project_id == pc.project.id
+            ).order_by(Export.export_date.desc()).all()
+            
+            if not exports:
+                return
+            
+            # Create menu
+            menu = QMenu(self)
+            
+            # Option: Use custom name
+            custom_action = menu.addAction("Use custom name")
+            custom_action.triggered.connect(lambda: self._set_export_selection(pc_id, None, use_custom=True))
+            
+            # Option: Use project name
+            project_action = menu.addAction(f"Use project name: {pc.project.name}")
+            project_action.triggered.connect(lambda: self._set_export_selection(pc_id, None, use_project=True))
+            
+            # Option: Use export song name
+            if pc.project.export_song_name:
+                export_song_action = menu.addAction(f"Use export song name: {pc.project.export_song_name}")
+                export_song_action.triggered.connect(lambda: self._set_export_selection(pc_id, None, use_export_song=True))
+            
+            if exports:
+                menu.addSeparator()
+                
+                # List of exports
+                for export in exports:
+                    export_action = menu.addAction(f"Use export: {export.export_name}")
+                    export_action.triggered.connect(lambda checked, e_id=export.id: self._set_export_selection(pc_id, e_id))
+            
+            # Show menu at button position
+            button = self.sender()
+            if button:
+                # Get the global position of the button
+                global_pos = button.mapToGlobal(button.rect().bottomLeft())
+                menu.exec(global_pos)
+            else:
+                # Fallback: show at cursor position
+                from PyQt6.QtGui import QCursor
+                menu.exec(QCursor.pos())
+                
+        finally:
+            session.close()
+    
+    def _set_export_selection(self, pc_id: int, export_id: Optional[int], 
+                              use_custom: bool = False, use_project: bool = False, 
+                              use_export_song: bool = False) -> None:
+        """Set the export selection for a track."""
+        from ...database import get_session, ProjectCollection
+        
+        session = get_session()
+        try:
+            pc = session.query(ProjectCollection).get(pc_id)
+            if not pc:
+                return
+            
+            if use_custom:
+                # Clear export_id, keep track_name if set
+                pc.export_id = None
+            elif use_project:
+                # Clear export_id and track_name, use project.name
+                pc.export_id = None
+                pc.track_name = None
+            elif use_export_song:
+                # Clear export_id and track_name, use export_song_name
+                pc.export_id = None
+                pc.track_name = None
+            else:
+                # Set export_id
+                pc.export_id = export_id
+                # Optionally clear track_name to use export name
+                pc.track_name = None
+            
+            session.commit()
+            
+            # Refresh collection and repopulate table
+            self._refresh_collection_from_db()
             self._populate_tracks()
             
         finally:
@@ -605,39 +889,11 @@ class CollectionDetailView(QWidget):
                 if pc:
                     session.delete(pc)
                     session.commit()
+                    # Refresh collection and repopulate table
+                    self._refresh_collection_from_db()
                     self._populate_tracks()
             finally:
                 session.close()
-    
-    def _on_tracks_reordered(self, parent, start, end, destination, row) -> None:
-        """Handle track reordering via drag and drop."""
-        if not self._collection:
-            return
-        
-        from ...database import get_session, ProjectCollection
-        
-        session = get_session()
-        try:
-            # Get all ProjectCollection entries for this collection
-            all_pcs = session.query(ProjectCollection).filter(
-                ProjectCollection.collection_id == self._collection.id
-            ).order_by(ProjectCollection.track_number).all()
-            
-            # Reorder track numbers based on new table order
-            for row_idx in range(self.track_table.rowCount()):
-                item = self.track_table.item(row_idx, 0)
-                if item:
-                    pc_id = item.data(Qt.ItemDataRole.UserRole)
-                    pc = next((p for p in all_pcs if p.id == pc_id), None)
-                    if pc:
-                        pc.track_number = row_idx + 1
-            
-            session.commit()
-            # Refresh to update display
-            QTimer.singleShot(100, self._populate_tracks)
-            
-        finally:
-            session.close()
     
     def _on_edit(self) -> None:
         """Show edit collection dialog."""

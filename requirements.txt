@@ -2,38 +2,43 @@
 # Install with: pip install -r requirements.txt
 
 # UI Framework
-PyQt6>=6.6.0
+PyQt6>=6.10.0
 
 # Database
 SQLAlchemy>=2.0.0
-aiosqlite>=0.19.0
+aiosqlite>=0.22.0
 
 # File System Monitoring
-watchdog>=3.0.0
+watchdog>=6.0.0
 
 # Network Discovery (Ableton Link)
-zeroconf>=0.131.0
+zeroconf>=0.148.0
 
 # Async Qt Integration
-qasync>=0.27.0
+qasync>=0.28.0
 
 # Image Processing (for artwork)
-Pillow>=10.0.0
+Pillow>=12.0.0
 
 # Fuzzy String Matching (for export detection)
-rapidfuzz>=3.0.0
+rapidfuzz>=3.14.0
 
 # ML/AI Features (Phase 5+) - Lazy loaded to avoid slow startup
-scikit-learn>=1.3.0  # Used in: ml_clustering, similarity_analyzer, ml_feature_extractor
-numpy>=1.24.0  # Used in: ml_feature_extractor, similarity_analyzer, ml_clustering, recommendation_engine
-pandas>=2.0.0  # Future: Statistics & Analytics Dashboard (timeline analysis, data aggregation, export)
+scikit-learn>=1.8.0  # Used in: ml_clustering, similarity_analyzer, ml_feature_extractor
+# TESTING: Upgraded to numpy 2.x - major version change, testing compatibility with scikit-learn, librosa, pandas
+# See numpy 2.0 migration guide: https://numpy.org/devdocs/numpy_2_0_migration_guide.html
+numpy>=2.0.0  # Used in: ml_feature_extractor, similarity_analyzer, ml_clustering, recommendation_engine
+# TESTING: Upgraded to pandas 3.x - major version change, removed deprecated functionality
+# Requires Python 3.11+, upgrade path: pandas 2.3 -> 3.0
+# See pandas 3.0 migration guide: https://pandas.pydata.org/docs/whatsnew/v3.0.0.html
+pandas>=3.0.0  # Future: Statistics & Analytics Dashboard (timeline analysis, data aggregation, export)
 
 # Audio Feature Extraction (for ML content analysis) - Lazy loaded
-librosa>=0.10.0  # Used in: ml_feature_extractor (audio analysis)
-soundfile>=0.12.0  # Used in: ml_feature_extractor (required by librosa)
+librosa>=0.11.0  # Used in: ml_feature_extractor (audio analysis)
+soundfile>=0.13.0  # Used in: ml_feature_extractor (required by librosa)
 
 # Enhanced XML Parsing (for deeper ALS analysis) - Optional, falls back to stdlib
-lxml>=4.9.0  # Used in: als_parser (optional, improves XPath support)
+lxml>=6.0.0  # Used in: als_parser (optional, improves XPath support)
 
 # Optional: Enhanced ALS parsing
 # pyableton>=0.1.0  # Uncomment if available
