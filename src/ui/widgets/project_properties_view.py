@@ -8,12 +8,12 @@ from PyQt6.QtWidgets import (
     QPushButton, QLineEdit, QTextEdit, QComboBox,
     QMessageBox, QGroupBox, QCheckBox, QSlider,
     QListWidget, QListWidgetItem, QCompleter, QScrollArea, QFrame,
-    QSizePolicy
+    QSizePolicy, QDialog
 )
 from PyQt6.QtCore import Qt, QStringListModel, pyqtSignal, QThread, QObject
 from PyQt6.QtGui import QColor
 
-from ...database import get_session, Project, Location, Collection, ProjectCollection, Export
+from ...database import get_session, Project, Location, Collection, ProjectCollection, Export, ProjectTag
 from ...services.audio_player import AudioPlayer, format_duration
 from ...utils.fuzzy_match import extract_song_name
 from ...utils.paths import find_backup_files
@@ -487,6 +487,11 @@ class ProjectPropertiesView(QWidget):
         volume_layout.addWidget(self.volume_slider)
         volume_layout.addStretch()
         
+        browse_exports_btn = QPushButton("Browse Exports...")
+        browse_exports_btn.setToolTip("Browse and select one or multiple audio files to link to this project")
+        browse_exports_btn.clicked.connect(self._browse_select_exports)
+        volume_layout.addWidget(browse_exports_btn)
+        
         find_exports_btn = QPushButton("Find Exports...")
         find_exports_btn.setToolTip("Scan for audio exports matching this project")
         find_exports_btn.clicked.connect(self._find_exports)
@@ -750,11 +755,12 @@ class ProjectPropertiesView(QWidget):
             # Populate export name suggestions
             self._populate_export_name_suggestions()
             
-            # Tags
-            if self._project.tags:
-                self.tag_selector.set_selected_tags(self._project.tags)
-            else:
-                self.tag_selector.set_selected_tags([])
+            # Tags - use junction table
+            tag_ids = [pt.tag_id for pt in self._project.project_tags] if self._project.project_tags else []
+            if not tag_ids and self._project.tags:
+                # Fallback to legacy JSON field for backward compatibility
+                tag_ids = self._project.tags if isinstance(self._project.tags, list) else []
+            self.tag_selector.set_selected_tags(tag_ids)
             
             # Collections
             if self._project.project_collections:
@@ -1050,7 +1056,28 @@ class ProjectPropertiesView(QWidget):
                 project.rating = self.rating_combo.currentIndex() or None
                 project.is_favorite = self.favorite_checkbox.isChecked()
                 project.notes = self.notes_input.toPlainText().strip() or None
-                project.tags = self.tag_selector.get_selected_tags()
+                
+                # Update tags using junction table
+                selected_tag_ids = set(self.tag_selector.get_selected_tags())
+                current_tag_ids = {pt.tag_id for pt in project.project_tags}
+                
+                # Remove tags that are no longer selected
+                for pt in list(project.project_tags):
+                    if pt.tag_id not in selected_tag_ids:
+                        session.delete(pt)
+                
+                # Add new tags
+                for tag_id in selected_tag_ids:
+                    if tag_id not in current_tag_ids:
+                        # Verify tag exists
+                        from ...database import Tag
+                        tag = session.query(Tag).get(tag_id)
+                        if tag:
+                            pt = ProjectTag(project_id=project.id, tag_id=tag_id)
+                            session.add(pt)
+                
+                # Also update legacy JSON field for backward compatibility
+                project.tags = list(selected_tag_ids)
                 
                 session.commit()
                 
@@ -1291,6 +1318,60 @@ class ProjectPropertiesView(QWidget):
         project_id = item.data(Qt.ItemDataRole.UserRole)
         if project_id:
             self.set_project(project_id)
+    
+    def _browse_select_exports(self) -> None:
+        """Browse and select audio files to link as exports."""
+        if not self._project:
+            return
+        
+        from PyQt6.QtWidgets import QFileDialog
+        from ...services.export_tracker import ExportTracker
+        
+        # Get project path for initial directory
+        initial_dir = str(Path(self._project.file_path).parent)
+        
+        # Open file dialog for multiple files
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select Export Files",
+            initial_dir,
+            "Audio Files (*.wav *.mp3 *.flac *.aiff *.aif *.ogg *.m4a);;All Files (*.*)"
+        )
+        
+        if not file_paths:
+            return
+        
+        # Link selected files to project
+        tracker = ExportTracker()
+        linked_count = 0
+        
+        session = get_session()
+        try:
+            for file_path in file_paths:
+                path = Path(file_path)
+                if path.suffix.lower() not in {'.wav', '.mp3', '.flac', '.aiff', '.aif', '.ogg', '.m4a'}:
+                    continue
+                
+                # Add export to database and link to project
+                export_id = tracker.add_export(file_path, self.project_id)
+                if export_id:
+                    linked_count += 1
+            
+            if linked_count > 0:
+                session.commit()
+                QMessageBox.information(
+                    self, "Exports Linked",
+                    f"Successfully linked {linked_count} export(s) to this project."
+                )
+                # Reload project to show newly linked exports
+                self._load_project_sync()
+            else:
+                QMessageBox.information(
+                    self, "No Files Linked",
+                    "No valid audio files were selected or files could not be linked."
+                )
+        finally:
+            session.close()
     
     def _find_exports(self) -> None:
         """Find and link exports for this project."""

@@ -4,7 +4,7 @@
 
 # Ableton Hub
 
-**Version 1.0.0**
+**Version 1.0.1**
 
 ## What is Ableton Hub?
 

@@ -8,7 +8,7 @@ from enum import Enum
 
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, DateTime, Float,
-    ForeignKey, JSON, Enum as SQLEnum, Index, UniqueConstraint
+    ForeignKey, JSON, Enum as SQLEnum, Index, UniqueConstraint, CheckConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -84,8 +84,35 @@ class Tag(Base):
     category = Column(String(100), nullable=True)
     created_date = Column(DateTime, default=datetime.utcnow)
     
+    # Relationships
+    project_tags = relationship("ProjectTag", back_populates="tag", cascade="all, delete-orphan")
+    
     def __repr__(self) -> str:
         return f"<Tag(id={self.id}, name='{self.name}')>"
+
+
+class ProjectTag(Base):
+    """Junction table for many-to-many relationship between projects and tags."""
+    
+    __tablename__ = "project_tags"
+    
+    id = Column(Integer, primary_key=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete='CASCADE'), nullable=False)
+    tag_id = Column(Integer, ForeignKey("tags.id", ondelete='CASCADE'), nullable=False)
+    created_date = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    project = relationship("Project", back_populates="project_tags")
+    tag = relationship("Tag", back_populates="project_tags")
+    
+    __table_args__ = (
+        UniqueConstraint('project_id', 'tag_id', name='unique_project_tag'),
+        Index('idx_project_tags_project', 'project_id'),
+        Index('idx_project_tags_tag', 'tag_id'),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<ProjectTag(project_id={self.project_id}, tag_id={self.tag_id})>"
 
 
 class Collection(Base):
@@ -136,7 +163,7 @@ class Project(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False)
     file_path = Column(String(1024), nullable=False, unique=True)
-    location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)
+    location_id = Column(Integer, ForeignKey("locations.id", ondelete='SET NULL'), nullable=True)
     
     # File metadata
     file_size = Column(Integer, default=0)  # Bytes
@@ -156,11 +183,17 @@ class Project(Base):
     # User metadata
     export_song_name = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
-    tags = Column(JSON, default=list)  # List of tag IDs
+    tags = Column(JSON, default=list)  # List of tag IDs (DEPRECATED: Use project_tags relationship)
     custom_metadata = Column(JSON, default=dict)
     
     # Rating (1-5)
     rating = Column(Integer, nullable=True)
+    
+    __table_args__ = (
+        CheckConstraint('rating IS NULL OR (rating >= 1 AND rating <= 5)', name='check_rating_range'),
+        CheckConstraint('tempo IS NULL OR (tempo > 0 AND tempo < 1000)', name='check_tempo_range'),
+        CheckConstraint('file_size >= 0', name='check_file_size'),
+    )
     
     # Color coding
     color = Column(String(7), nullable=True)
@@ -195,6 +228,7 @@ class Project(Base):
         cascade="all, delete-orphan"
     )
     exports = relationship("Export", back_populates="project", cascade="all, delete-orphan")
+    project_tags = relationship("ProjectTag", back_populates="project", cascade="all, delete-orphan")
     
     @property
     def collections(self) -> List[Collection]:
@@ -203,8 +237,16 @@ class Project(Base):
     
     @property
     def tag_list(self) -> List[int]:
-        """Get the list of tag IDs."""
+        """Get the list of tag IDs (from project_tags relationship)."""
+        if self.project_tags:
+            return [pt.tag_id for pt in self.project_tags]
+        # Fallback to legacy JSON field for backward compatibility
         return self.tags or []
+    
+    @property
+    def tag_objects(self) -> List["Tag"]:
+        """Get the list of Tag objects."""
+        return [pt.tag for pt in self.project_tags] if self.project_tags else []
     
     def get_plugins_list(self) -> List[str]:
         """Get plugins as a Python list."""
@@ -282,7 +324,7 @@ class ProjectCollection(Base):
     is_bonus = Column(Boolean, default=False)
     track_name = Column(String(255), nullable=True)  # Track name specific to this collection
     track_artwork_path = Column(String(1024), nullable=True)  # Artwork for this track
-    export_id = Column(Integer, ForeignKey("exports.id"), nullable=True)  # Selected export for track name
+    export_id = Column(Integer, ForeignKey("exports.id", ondelete='SET NULL'), nullable=True)  # Selected export for track name
     created_date = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -292,6 +334,7 @@ class ProjectCollection(Base):
     
     __table_args__ = (
         UniqueConstraint('project_id', 'collection_id', name='unique_project_collection'),
+        CheckConstraint('track_number IS NULL OR track_number > 0', name='check_track_number'),
     )
     
     def __repr__(self) -> str:
@@ -304,8 +347,8 @@ class Export(Base):
     __tablename__ = "exports"
     
     id = Column(Integer, primary_key=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
-    export_path = Column(String(1024), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete='SET NULL'), nullable=True)
+    export_path = Column(String(1024), nullable=False, unique=True)
     export_name = Column(String(255), nullable=False)
     export_date = Column(DateTime, nullable=True)
     
@@ -438,3 +481,11 @@ Index('idx_project_favorite', Project.is_favorite)
 Index('idx_location_active', Location.is_active)
 Index('idx_export_project', Export.project_id)
 Index('idx_app_settings_key', AppSettings.key)
+
+# Composite indexes for common query patterns (Phase 1 & 2)
+Index('idx_project_location_status', Project.location_id, Project.status)
+Index('idx_project_favorite_modified', Project.is_favorite, Project.modified_date)
+Index('idx_project_collection_track', ProjectCollection.collection_id, ProjectCollection.track_number)
+Index('idx_export_project_date', Export.project_id, Export.export_date)
+Index('idx_collection_type', Collection.collection_type)
+Index('idx_project_rating', Project.rating)

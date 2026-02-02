@@ -431,13 +431,19 @@ class ProjectTagSelector(QWidget):
     
     def _load_project_tags(self) -> None:
         """Load tags for the current project."""
-        from ...database import Project
+        from ...database import Project, ProjectTag
         
         session = get_session()
         try:
             project = session.query(Project).get(self.project_id)
-            if project and project.tags:
-                self._selected_tags = list(project.tags)
+            if project:
+                # Use junction table (with fallback to legacy JSON)
+                if project.project_tags:
+                    self._selected_tags = [pt.tag_id for pt in project.project_tags]
+                elif project.tags:
+                    self._selected_tags = list(project.tags) if isinstance(project.tags, list) else []
+                else:
+                    self._selected_tags = []
                 self._update_display()
         finally:
             session.close()

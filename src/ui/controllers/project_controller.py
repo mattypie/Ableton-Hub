@@ -64,8 +64,11 @@ class ProjectController(QObject):
                 elif filter_type == "Export":
                     query = query.filter(Project.export_song_name.ilike(f"%{search_query}%"))
                 elif filter_type == "Tags":
-                    # Search in tags JSON array
-                    query = query.filter(Project.tags.contains([search_query]))
+                    # Search in tags using junction table
+                    from ..database import ProjectTag, Tag
+                    query = query.join(ProjectTag).join(Tag).filter(
+                        Tag.name.ilike(f"%{search_query}%")
+                    ).distinct()
                 elif filter_type == "Notes":
                     query = query.filter(Project.notes.ilike(f"%{search_query}%"))
                 else:  # All

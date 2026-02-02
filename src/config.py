@@ -76,7 +76,7 @@ class Config:
     link: LinkConfig = field(default_factory=LinkConfig)
     ui: UIConfig = field(default_factory=UIConfig)
     first_run: bool = True
-    version: str = "1.0.0"
+    version: str = "1.0.1"
 
 
 class ConfigManager:
@@ -172,7 +172,7 @@ class ConfigManager:
             link=LinkConfig(**data.get('link', {})),
             ui=UIConfig(**data.get('ui', {})),
             first_run=data.get('first_run', True),
-            version=data.get('version', '1.0.0'),
+            version=data.get('version', '1.0.1'),
         )
 
 

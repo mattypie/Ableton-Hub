@@ -492,14 +492,35 @@ class MainWindow(QMainWindow):
         # Start file watcher for automatic updates
         self._start_watcher()
     
+    def _auto_scan_on_startup(self) -> None:
+        """Trigger automatic scan on startup after app is fully loaded."""
+        # Check if there are any active locations to scan
+        session = get_session()
+        try:
+            active_locations = session.query(Location).filter(Location.is_active == True).all()
+            if not active_locations:
+                return  # No locations to scan
+            
+            # Set flag to indicate this is an auto-scan
+            self._is_auto_scan = True
+            
+            # Update status bar
+            self.scan_status_label.setText("Auto-Scanning on Startup...")
+            
+            # Start the scan
+            self.scan_controller.start_scan()
+        finally:
+            session.close()
+    
     def _initial_load(self) -> None:
         """Load initial data on startup."""
         self._refresh_sidebar()
         self._load_projects()
         
-        # Note: Auto-scan on startup is disabled by default
-        # Users must manually trigger scans using the Scan button
-        # File watcher is started automatically to detect changes
+        # Start file watcher for automatic updates
+        # Auto-scan on startup after app is fully loaded
+        # Delay scan to ensure UI is fully rendered
+        QTimer.singleShot(1000, self._auto_scan_on_startup)
     
     def _start_watcher(self) -> None:
         """Start the file system watcher for automatic project updates."""
@@ -579,9 +600,11 @@ class MainWindow(QMainWindow):
         session = get_session()
         try:
             # Eagerly load relationships to avoid DetachedInstanceError
+            from sqlalchemy.orm import joinedload
             query = session.query(Project).options(
                 joinedload(Project.location),
-                joinedload(Project.exports)
+                joinedload(Project.exports),
+                joinedload(Project.project_tags)
             )
             
             # Always exclude backup projects (files in Backup folders)
@@ -608,8 +631,9 @@ class MainWindow(QMainWindow):
                 )
             
             if tag_id:
-                # Tags stored as JSON array of IDs
-                query = query.filter(Project.tags.contains([tag_id]))
+                # Use junction table for tag filtering
+                from ..database import ProjectTag
+                query = query.join(ProjectTag).filter(ProjectTag.tag_id == tag_id).distinct()
             
             # Apply favorites filter
             if favorites_only:
@@ -809,7 +833,9 @@ class MainWindow(QMainWindow):
         """Handle scan started signal."""
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.scan_status_label.setText("Scanning...")
+        # Status message will be set by _auto_scan_on_startup if it's an auto-scan
+        if not hasattr(self, '_is_auto_scan') or not self._is_auto_scan:
+            self.scan_status_label.setText("Scanning...")
     
     def _on_scan_error(self, error_msg: str) -> None:
         """Handle scan errors."""
@@ -826,7 +852,11 @@ class MainWindow(QMainWindow):
     def _on_scan_complete(self, found_count: int) -> None:
         """Handle scan completion."""
         self.progress_bar.setVisible(False)
-        status_msg = f"Scan complete: Found {found_count} new project(s)"
+        if hasattr(self, '_is_auto_scan') and self._is_auto_scan:
+            status_msg = f"Auto-scan complete: Found {found_count} new project(s)"
+            self._is_auto_scan = False
+        else:
+            status_msg = f"Scan complete: Found {found_count} new project(s)"
         self.scan_status_label.setText(status_msg)
         self._load_projects()
         self._refresh_sidebar()

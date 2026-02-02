@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from sqlalchemy import and_, or_
 
-from ..database import get_session, Collection, Project, ProjectCollection, Tag, Location
+from ..database import get_session, Collection, Project, ProjectCollection, Tag, Location, ProjectTag
 
 
 class SmartCollectionService:
@@ -38,12 +38,21 @@ class SmartCollectionService:
                 if tag_ids:
                     # Projects that have any of these tags
                     if rules.get('tags_mode', 'any') == 'all':
-                        # All tags must be present
+                        # All tags must be present - join for each tag
                         for tag_id in tag_ids:
-                            query = query.filter(Project.tags.contains([tag_id]))
+                            query = query.join(ProjectTag).filter(ProjectTag.tag_id == tag_id)
+                        query = query.distinct()
                     else:
-                        # Any tag present
-                        tag_conditions = [Project.tags.contains([tag_id]) for tag_id in tag_ids]
+                        # Any tag present - use OR condition with junction table
+                        tag_conditions = []
+                        for tag_id in tag_ids:
+                            tag_conditions.append(
+                                Project.id.in_(
+                                    session.query(ProjectTag.project_id).filter(
+                                        ProjectTag.tag_id == tag_id
+                                    )
+                                )
+                            )
                         conditions.append(or_(*tag_conditions))
             
             # Location filters

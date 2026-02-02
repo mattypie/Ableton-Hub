@@ -7,6 +7,7 @@ from .smart_collection import SmartCollectionDialog
 from .live_version_dialog import LiveVersionDialog
 from .add_live_installation import AddLiveInstallationDialog
 from .similar_projects_dialog import SimilarProjectsDialog
+from .select_exports_dialog import SelectExportsDialog
 
 __all__ = [
     "AddLocationDialog",
@@ -16,4 +17,5 @@ __all__ = [
     "LiveVersionDialog",
     "AddLiveInstallationDialog",
     "SimilarProjectsDialog",
+    "SelectExportsDialog",
 ]

@@ -1,15 +1,17 @@
 """Project grid/list view widget."""
 
 from typing import Optional, List, Set
+from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QScrollArea, QGridLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStackedWidget, QMenu, QLabel, QFrame, QMessageBox
+    QStackedWidget, QMenu, QLabel, QFrame, QMessageBox, QFileDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 from PyQt6.QtGui import QAction
 
 from ...database.models import Project
+from ...database import get_session
 from .project_card import ProjectCard
 from ..theme import AbletonTheme
 
@@ -264,16 +266,20 @@ class ProjectGrid(QWidget):
             # Tags - tags are stored as JSON array of tag IDs
             tags_str = ""
             try:
-                if project.tags and isinstance(project.tags, list):
-                    # Tags are stored as list of tag IDs, need to look up names
+                # Load tags from junction table (with fallback to legacy JSON)
+                tag_ids = []
+                if hasattr(project, 'project_tags') and project.project_tags:
+                    tag_ids = [pt.tag_id for pt in project.project_tags]
+                elif project.tags and isinstance(project.tags, list):
+                    tag_ids = [t for t in project.tags if isinstance(t, int)]
+                
+                if tag_ids:
                     from ...database import get_session, Tag
                     session = get_session()
                     try:
-                        tag_ids = [t for t in project.tags if isinstance(t, int)]
-                        if tag_ids:
-                            tags = session.query(Tag).filter(Tag.id.in_(tag_ids)).all()
-                            tag_names = [tag.name for tag in tags]
-                            tags_str = ", ".join(tag_names) if tag_names else ""
+                        tags = session.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+                        tag_names = [tag.name for tag in tags]
+                        tags_str = ", ".join(tag_names) if tag_names else ""
                     finally:
                         session.close()
             except (AttributeError, TypeError, Exception):
@@ -386,6 +392,15 @@ class ProjectGrid(QWidget):
         
         open_action = menu.addAction("Open in File Manager")
         open_action.triggered.connect(lambda: self.project_double_clicked.emit(project_id))
+        
+        menu.addSeparator()
+        
+        # Export actions
+        browse_exports_action = menu.addAction("Browse Exports...")
+        browse_exports_action.triggered.connect(lambda: self._browse_exports(project_id))
+        
+        find_exports_action = menu.addAction("Find Exports...")
+        find_exports_action.triggered.connect(lambda: self._find_exports(project_id))
         
         menu.addSeparator()
         
@@ -589,6 +604,86 @@ class ProjectGrid(QWidget):
             if hasattr(self, '_main_window') and hasattr(self._main_window, '_refresh_sidebar'):
                 self._main_window._refresh_sidebar()
             
+        finally:
+            session.close()
+    
+    def _browse_exports(self, project_id: int) -> None:
+        """Browse and select audio files to link as exports."""
+        session = get_session()
+        try:
+            project = session.query(Project).get(project_id)
+            if not project:
+                return
+            
+            # Get project path for initial directory
+            initial_dir = str(Path(project.file_path).parent)
+            
+            # Open file dialog for multiple files
+            file_paths, _ = QFileDialog.getOpenFileNames(
+                self,
+                "Select Export Files",
+                initial_dir,
+                "Audio Files (*.wav *.mp3 *.flac *.aiff *.aif *.ogg *.m4a);;All Files (*.*)"
+            )
+            
+            if not file_paths:
+                return
+            
+            # Link selected files to project
+            from ...services.export_tracker import ExportTracker
+            tracker = ExportTracker()
+            linked_count = 0
+            
+            for file_path in file_paths:
+                path = Path(file_path)
+                if path.suffix.lower() not in {'.wav', '.mp3', '.flac', '.aiff', '.aif', '.ogg', '.m4a'}:
+                    continue
+                
+                # Add export to database and link to project
+                export_id = tracker.add_export(file_path, project_id)
+                if export_id:
+                    linked_count += 1
+            
+            if linked_count > 0:
+                session.commit()
+                QMessageBox.information(
+                    self, "Exports Linked",
+                    f"Successfully linked {linked_count} export(s) to this project."
+                )
+                # Refresh the view to show updated export indicators
+                self._refresh_view()
+            else:
+                QMessageBox.information(
+                    self, "No Files Linked",
+                    "No valid audio files were selected or files could not be linked."
+                )
+        finally:
+            session.close()
+    
+    def _find_exports(self, project_id: int) -> None:
+        """Find and link exports for this project."""
+        from ...services.export_tracker import ExportTracker
+        
+        tracker = ExportTracker()
+        
+        session = get_session()
+        try:
+            matched = tracker.auto_match_exports(threshold=60.0)
+            
+            if matched > 0:
+                QMessageBox.information(
+                    self, "Exports Found",
+                    f"Found and linked {matched} export(s)."
+                )
+                # Refresh the view to show updated export indicators
+                self._refresh_view()
+            else:
+                QMessageBox.information(
+                    self, "No Exports Found",
+                    "No matching exports were found.\n\n"
+                    "Make sure your export folders are added as locations "
+                    "and have been scanned."
+                )
         finally:
             session.close()
     

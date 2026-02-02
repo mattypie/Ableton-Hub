@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy import String, nullslast, nullsfirst
 
 from ..db import get_session
-from ..models import Project, Location, ProjectCollection
+from ..models import Project, Location, ProjectCollection, ProjectTag
 from ...utils.logging import get_logger
 
 
@@ -51,7 +51,8 @@ class ProjectRepository:
             # Eagerly load relationships
             query = session.query(Project).options(
                 joinedload(Project.location),
-                joinedload(Project.exports)
+                joinedload(Project.exports),
+                joinedload(Project.project_tags)
             )
             
             # Apply filters
@@ -64,7 +65,8 @@ class ProjectRepository:
                 )
             
             if tag_id:
-                query = query.filter(Project.tags.contains([tag_id]))
+                # Use junction table for tag filtering
+                query = query.join(ProjectTag).filter(ProjectTag.tag_id == tag_id).distinct()
             
             # Apply date filter
             if date_filter and date_filter != "clear":
@@ -149,7 +151,8 @@ class ProjectRepository:
         try:
             return session.query(Project).options(
                 joinedload(Project.location),
-                joinedload(Project.exports)
+                joinedload(Project.exports),
+                joinedload(Project.project_tags)
             ).filter(Project.id == project_id).first()
         finally:
             session.close()
