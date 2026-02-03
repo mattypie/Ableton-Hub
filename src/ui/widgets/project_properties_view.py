@@ -236,6 +236,51 @@ class ProjectPropertiesView(QWidget):
         
         layout.addWidget(project_group)
         
+        # Timeline Markers section
+        markers_group = QGroupBox("Timeline Markers")
+        markers_group.setStyleSheet(self._group_box_style())
+        markers_layout = QVBoxLayout(markers_group)
+        
+        # Markers list widget
+        self.markers_list = QListWidget()
+        self.markers_list.setMaximumHeight(200)
+        self.markers_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {AbletonTheme.COLORS['surface']};
+                border: 1px solid {AbletonTheme.COLORS['border']};
+                border-radius: 4px;
+                padding: 4px;
+            }}
+            QListWidget::item {{
+                padding: 6px;
+                border-bottom: 1px solid {AbletonTheme.COLORS['border']};
+            }}
+            QListWidget::item:selected {{
+                background-color: {AbletonTheme.COLORS['accent']};
+                color: {AbletonTheme.COLORS['text_on_accent']};
+            }}
+        """)
+        markers_layout.addWidget(self.markers_list)
+        
+        # Export markers button
+        export_markers_btn = QPushButton("Export Markers...")
+        export_markers_btn.clicked.connect(self._export_markers)
+        export_markers_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {AbletonTheme.COLORS['surface']};
+                border: 1px solid {AbletonTheme.COLORS['border']};
+                border-radius: 4px;
+                padding: 6px 12px;
+                color: {AbletonTheme.COLORS['text_primary']};
+            }}
+            QPushButton:hover {{
+                background-color: {AbletonTheme.COLORS['surface_hover']};
+            }}
+        """)
+        markers_layout.addWidget(export_markers_btn)
+        
+        layout.addWidget(markers_group)
+        
         # Collections
         collections_group = QGroupBox("Collections")
         collections_group.setStyleSheet(self._group_box_style())
@@ -595,6 +640,9 @@ class ProjectPropertiesView(QWidget):
             else:
                 self.parsed_label.setText("Never")
             
+            # Timeline Markers
+            self._update_markers_display()
+            
             # Plugins
             self.plugins_list.clear()
             plugins = self._project.get_plugins_list() if hasattr(self._project, 'get_plugins_list') else (self._project.plugins or [])
@@ -788,8 +836,23 @@ class ProjectPropertiesView(QWidget):
         
         # Stop existing thread if running
         if self._similar_thread and self._similar_thread.isRunning():
+            if self._similar_worker:
+                self._similar_worker.cancel()
+                # Disconnect signals before cleanup
+                try:
+                    self._similar_worker.finished.disconnect()
+                    self._similar_worker.error.disconnect()
+                except (TypeError, RuntimeError):
+                    pass  # Signals may already be disconnected
             self._similar_thread.quit()
-            self._similar_thread.wait()
+            if not self._similar_thread.wait(2000):  # Wait up to 2 seconds
+                self._similar_thread.terminate()
+                self._similar_thread.wait(1000)
+            self._similar_thread.deleteLater()
+            if self._similar_worker:
+                self._similar_worker.deleteLater()
+            self._similar_thread = None
+            self._similar_worker = None
         
         self._similar_thread = QThread()
         # Create worker without parent - required for moveToThread
@@ -1290,6 +1353,93 @@ class ProjectPropertiesView(QWidget):
                 )
         finally:
             session.close()
+    
+    def _update_markers_display(self) -> None:
+        """Update the timeline markers display."""
+        if not self._project:
+            return
+        
+        self.markers_list.clear()
+        
+        # Get markers from project
+        markers = self._project.get_timeline_markers_list() if hasattr(self._project, 'get_timeline_markers_list') else []
+        
+        if not markers:
+            item = QListWidgetItem("No timeline markers found")
+            item.setFlags(Qt.ItemFlag.NoItemFlags)  # Make it non-selectable
+            self.markers_list.addItem(item)
+            return
+        
+        # Display markers with formatted time
+        for marker in markers:
+            time_sec = marker.get('time', 0.0)
+            text = marker.get('text', '')
+            
+            # Format time as MM:SS.mmm
+            minutes = int(time_sec // 60)
+            seconds = int(time_sec % 60)
+            milliseconds = int((time_sec % 1) * 1000)
+            
+            if minutes > 0:
+                time_str = f"{minutes}:{seconds:02d}.{milliseconds:03d}"
+            else:
+                time_str = f"{seconds}.{milliseconds:03d}"
+            
+            item_text = f"{time_str}  {text}"
+            item = QListWidgetItem(item_text)
+            item.setData(Qt.ItemDataRole.UserRole, marker)  # Store full marker data
+            self.markers_list.addItem(item)
+    
+    def _export_markers(self) -> None:
+        """Export timeline markers to a text or CSV file."""
+        if not self._project:
+            return
+        
+        markers = self._project.get_timeline_markers_list() if hasattr(self._project, 'get_timeline_markers_list') else []
+        
+        if not markers:
+            QMessageBox.information(
+                self, "No Markers",
+                "This project has no timeline markers to export."
+            )
+            return
+        
+        from PyQt6.QtWidgets import QFileDialog
+        
+        # Get project directory for initial save location
+        project_dir = Path(self._project.file_path).parent
+        default_filename = f"{self._project.name}_markers.txt"
+        default_path = project_dir / default_filename
+        
+        # Open save dialog
+        file_path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Export Timeline Markers",
+            str(default_path),
+            "Text Files (*.txt);;CSV Files (*.csv);;All Files (*.*)"
+        )
+        
+        if not file_path:
+            return
+        
+        try:
+            from ...services.marker_export import export_markers_to_text, export_markers_to_csv
+            
+            path = Path(file_path)
+            if path.suffix.lower() == '.csv':
+                export_markers_to_csv(markers, path)
+            else:
+                export_markers_to_text(markers, path)
+            
+            QMessageBox.information(
+                self, "Export Successful",
+                f"Timeline markers exported to:\n{file_path}"
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Export Failed",
+                f"Failed to export markers:\n{str(e)}"
+            )
     
     def _find_exports(self) -> None:
         """Find and link exports for this project."""

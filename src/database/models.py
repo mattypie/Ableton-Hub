@@ -3,7 +3,7 @@
 import json
 import re
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from enum import Enum
 
 from sqlalchemy import (
@@ -220,6 +220,9 @@ class Project(Base):
     scale_type = Column(String(50), nullable=True)  # Scale type (e.g., "Major", "Minor", "Dorian")
     is_in_key = Column(Boolean, nullable=True)  # Whether "In Key" mode is enabled
     
+    # Timeline markers (extracted from .als files using dawtool)
+    timeline_markers = Column(JSON, default=list)  # List of timeline markers: [{"time": float, "text": str}]
+    
     # Relationships
     location = relationship("Location", back_populates="projects")
     project_collections = relationship(
@@ -306,6 +309,16 @@ class Project(Base):
         if isinstance(self.sample_references, str):
             return json.loads(self.sample_references) if self.sample_references else []
         return self.sample_references or []
+    
+    def get_timeline_markers_list(self) -> List[Dict[str, Any]]:
+        """Get timeline markers as a Python list.
+        
+        Returns:
+            List of marker dicts with 'time' (float) and 'text' (str) keys.
+        """
+        if isinstance(self.timeline_markers, str):
+            return json.loads(self.timeline_markers) if self.timeline_markers else []
+        return self.timeline_markers or []
     
     def __repr__(self) -> str:
         return f"<Project(id={self.id}, name='{self.name}')>"

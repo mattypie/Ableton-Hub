@@ -88,6 +88,25 @@ class ScanController(QObject):
             found_count: Number of projects found.
         """
         self.logger.info(f"Scan complete: Found {found_count} new project(s)")
+        
+        # Wait for scanner thread to fully complete before clearing reference
+        # This prevents race conditions where the thread is still running
+        # when we set scanner to None
+        if self._scanner:
+            # Check if worker thread is still running
+            if self._scanner.is_running:
+                self.logger.debug("Waiting for scanner thread to finish...")
+                # Give it a moment - the scanner's _on_complete should handle cleanup
+                # but we wait here to ensure thread is fully done
+                import time
+                timeout = 3.0  # 3 seconds max wait
+                start_time = time.time()
+                while self._scanner.is_running and (time.time() - start_time) < timeout:
+                    time.sleep(0.1)
+                if self._scanner.is_running:
+                    self.logger.warning("Scanner thread still running after timeout, forcing stop")
+                    self._scanner.stop()
+        
         self.scan_complete.emit(found_count)
         self._scanner = None
     
@@ -102,6 +121,10 @@ class ScanController(QObject):
         if self._scanner:
             # Add scanner state info
             context_msg += f" (Scanner running: {self._scanner.is_running})"
+            # Ensure scanner is stopped on error
+            if self._scanner.is_running:
+                self.logger.debug("Stopping scanner due to error")
+                self._scanner.stop()
         
         self.logger.error(context_msg)
         self.scan_error.emit(error_msg)
@@ -131,10 +154,38 @@ class ScanController(QObject):
         worker = ProjectRescanWorker(project_id, self)
         
         def on_finished():
+            # Disconnect signals before cleanup
+            try:
+                worker.finished.disconnect()
+                worker.error.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+            
+            # Wait for thread to finish
+            if worker.isRunning():
+                worker.quit()
+                if not worker.wait(2000):
+                    worker.terminate()
+                    worker.wait(1000)
+            
             self.project_rescanned.emit(project_id)
             worker.deleteLater()
         
         def on_error(error_msg: str):
+            # Disconnect signals before cleanup
+            try:
+                worker.finished.disconnect()
+                worker.error.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+            
+            # Wait for thread to finish
+            if worker.isRunning():
+                worker.quit()
+                if not worker.wait(2000):
+                    worker.terminate()
+                    worker.wait(1000)
+            
             self._on_error(error_msg)
             worker.deleteLater()
         

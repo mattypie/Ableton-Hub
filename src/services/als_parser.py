@@ -115,6 +115,9 @@ class ProjectMetadata:
     scale_type: Optional[str] = None  # Scale type (e.g., "Major", "Minor", "Dorian")
     is_in_key: Optional[bool] = None  # Whether "In Key" mode is enabled globally
     
+    # Timeline markers (extracted using dawtool)
+    timeline_markers: List[Dict[str, Any]] = field(default_factory=list)  # List of {time: float, text: str}
+    
     # Extended metadata for ML features (Phase 5)
     extended: Optional[ExtendedMetadata] = None
     
@@ -129,17 +132,31 @@ class ALSParser:
     enhancement for better XPath support and performance.
     """
     
-    def __init__(self, extract_extended: bool = False, use_lxml: bool = None):
+    def __init__(self, extract_extended: bool = False, use_lxml: bool = None, extract_markers: bool = True):
         """Initialize the parser.
         
         Args:
             extract_extended: If True, extract extended metadata for ML features.
             use_lxml: Force lxml usage (True), disable it (False), or auto-detect (None).
+            extract_markers: If True, extract timeline markers using dawtool (default: True).
         """
         self.logger = get_logger(__name__)
         self._cache: Dict[str, ProjectMetadata] = {}
         self._extract_extended = extract_extended
         self._use_lxml = use_lxml if use_lxml is not None else USE_LXML
+        self._extract_markers = extract_markers
+        
+        # Lazy import marker extractor to avoid import errors if dawtool not available
+        self._marker_extractor = None
+        if self._extract_markers:
+            try:
+                from .marker_extractor import MarkerExtractor
+                self._marker_extractor = MarkerExtractor()
+                if not self._marker_extractor.is_available:
+                    self.logger.debug("dawtool not available - timeline markers will not be extracted")
+            except Exception as e:
+                self.logger.warning(f"Failed to initialize marker extractor: {e}")
+                self._marker_extractor = None
     
     def parse(self, als_path: Path) -> Optional[ProjectMetadata]:
         """Parse an .als file and extract metadata.
@@ -211,6 +228,20 @@ class ALSParser:
             metadata.musical_key = key_info.get('key')
             metadata.scale_type = key_info.get('scale')
             metadata.is_in_key = key_info.get('is_in_key')
+            
+            # Extract timeline markers using dawtool (if enabled and available)
+            if self._extract_markers and self._marker_extractor:
+                try:
+                    markers = self._marker_extractor.extract_markers(als_path)
+                    metadata.timeline_markers = markers
+                    if markers:
+                        self.logger.debug(f"Extracted {len(markers)} timeline markers from {als_path.name}")
+                except Exception as e:
+                    # Don't fail parsing if marker extraction fails
+                    self.logger.warning(f"Failed to extract timeline markers from {als_path}: {e}")
+                    metadata.timeline_markers = []
+            else:
+                metadata.timeline_markers = []
             
             # Cache result
             self._cache[cache_key] = metadata

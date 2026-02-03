@@ -419,7 +419,32 @@ class MLFeatureExtractor:
             all_features.extend([0.0] * len(self._get_audio_feature_names()))
         
         np = _get_numpy()
-        return np.array(all_features, dtype=np.float32)
+        
+        # Convert to numpy array and sanitize values before float32 conversion
+        arr = np.array(all_features, dtype=np.float64)
+        
+        # Check for problematic values before sanitization
+        has_nan = np.isnan(arr).any()
+        has_inf = np.isinf(arr).any()
+        float32_max = np.finfo(np.float32).max
+        float32_min = np.finfo(np.float32).min
+        has_overflow = (np.abs(arr) > float32_max).any()
+        
+        if has_nan or has_inf or has_overflow:
+            self.logger.warning(
+                f"Sanitizing feature vector: NaN={has_nan}, Inf={has_inf}, "
+                f"Overflow={has_overflow}. Replacing with safe values."
+            )
+        
+        # Replace infinity and NaN with 0.0
+        arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+        
+        # Clip values to float32 range to prevent overflow
+        # float32 max value is approximately 3.4028235e+38
+        arr = np.clip(arr, float32_min, float32_max)
+        
+        # Now safe to convert to float32
+        return arr.astype(np.float32)
     
     def get_combined_feature_names(self) -> List[str]:
         """Get all feature names for the combined vector."""

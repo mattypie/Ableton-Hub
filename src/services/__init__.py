@@ -21,6 +21,7 @@ from .smart_collections import SmartCollectionService
 from .duplicate_detector import DuplicateDetector
 from .health_calculator import HealthCalculator
 from .audio_preview import AudioPreviewGenerator
+from .marker_extractor import MarkerExtractor
 from .als_parser import (
     ALSParser, 
     ProjectMetadata, 
@@ -94,6 +95,7 @@ __all__ = [
     "DuplicateDetector",
     "HealthCalculator",
     "AudioPreviewGenerator",
+    "MarkerExtractor",
     "ALSParser",
     "ProjectMetadata",
     "ExtendedMetadata",

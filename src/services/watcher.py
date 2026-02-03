@@ -437,6 +437,14 @@ class FileWatcher(QObject):
         project.has_automation = metadata.has_automation
         project.last_parsed = datetime.utcnow()
         
+        # Musical key/scale information
+        project.musical_key = metadata.musical_key
+        project.scale_type = metadata.scale_type
+        project.is_in_key = metadata.is_in_key
+        
+        # Timeline markers (extracted using dawtool)
+        project.timeline_markers = json.dumps(metadata.timeline_markers) if metadata.timeline_markers else '[]'
+        
         # Note: export_song_name is NOT auto-populated during file watching.
         # Users can manually set it via the Properties view or use the "Suggest" button.
     

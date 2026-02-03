@@ -41,6 +41,7 @@ Built with Python (programming language) and PyQt6 (GUI framework), Ableton Hub 
   - Ableton Live version
   - Sample references
   - Automation status
+  - **Timeline Markers**: Extract timeline markers (locators) with timestamps and text annotations
 - **File Hash Tracking**: SHA256 hashing for duplicate detection and integrity verification
 - **Project Health Dashboard**: Monitor project health metrics, identify issues, and track project status
 - **Visual Export Indicators**: Projects with exports display colorized icons
@@ -59,12 +60,20 @@ Built with Python (programming language) and PyQt6 (GUI framework), Ableton Hub 
   - Track re-ordering
 - **Collection Types**: Support for albums, EPs, sessions, compilations, and custom types
 
+#### Timeline Markers & Export
+- **Timeline Marker Extraction**: Automatically extracts timeline markers (locators) from projects using dawtool
+  - Supports Live v8-12 with tempo automation handling
+  - Display markers in Project Properties view
+  - Export markers to text or CSV format
+  - Useful for DJ mixes, podcasts, film projects, and project documentation
+
 #### Search & Discovery
 - **Full-Text Search**: Powerful search (using FTS5 - Full-Text Search engine) across:
   - Project names
   - Export song names
   - Notes and tags
   - Plugins and devices
+  - Timeline marker text
 - **Advanced Filtering**:
   - Date filters (Today, This Week, This Month, Last 7/30 Days, Custom Range)
   - Location-based filtering
@@ -564,6 +573,7 @@ Contributions are welcome! Please see the **[Contributing Guide](CONTRIBUTING.md
 - **[Planned Features Roadmap](docs/PLANNED_FEATURES.plan)** - Detailed implementation plans for future features
 
 ### Recently Completed
+- ✅ **Timeline Marker Extraction** - Extract timeline markers (locators) from projects using dawtool, display in Project Properties, and export to text/CSV
 - ✅ **Enhanced Logging System** - Comprehensive logging with file rotation, configurable levels, log viewer, and global exception handling
 - ✅ **Database Performance Optimizations** - SQLite WAL mode, optimized cache, composite indexes for faster queries
 - ✅ **GUI Widget Optimizations** - Modular architecture with specialized managers, background processing, efficient signal management

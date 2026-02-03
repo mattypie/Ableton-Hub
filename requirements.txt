@@ -40,9 +40,13 @@ soundfile>=0.13.0  # Used in: ml_feature_extractor (required by librosa)
 # Enhanced XML Parsing (for deeper ALS analysis) - Optional, falls back to stdlib
 lxml>=6.0.0  # Used in: als_parser (optional, improves XPath support)
 
+# Timeline Marker Extraction (for .als files)
+# Required for timeline marker extraction feature
+dawtool @ git+https://github.com/offlinemark/dawtool  # Extract timeline markers from Ableton Live projects (supports Live v8-12)
+
 # Optional: Enhanced ALS parsing
 # pyableton>=0.1.0  # Uncomment if available
-# abletonparsing>=0.1.0  # For .asd clip files (Live 9/10/11)
+# abletonparsing>=0.1.2  # For .asd clip files (Live 9/10 only, NOT Live 12) - Optional enhancement
 
 # Development Dependencies (optional)
 # pytest>=7.4.0

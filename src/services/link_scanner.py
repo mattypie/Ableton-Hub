@@ -171,17 +171,34 @@ class LinkScanner(QObject):
         """Stop scanning."""
         self._cleanup_timer.stop()
         
-        if self._worker:
-            self._worker.stop()
-            if self._worker.isRunning():
-                # Wait for thread to finish
-                if not self._worker.wait(5000):  # Wait up to 5 seconds
-                    # If still running, try to terminate
-                    self._worker.terminate()
-                    self._worker.wait(2000)  # Wait a bit more
-            # Clean up worker
-            self._worker.deleteLater()
-            self._worker = None
+        if not self._worker:
+            self.scan_stopped.emit()
+            return
+        
+        worker = self._worker
+        self._worker = None
+        
+        # Request stop
+        worker.stop()
+        
+        # Disconnect all signals to prevent crashes
+        try:
+            worker.device_found.disconnect()
+            worker.device_lost.disconnect()
+            worker.error.disconnect()
+        except (TypeError, RuntimeError):
+            pass  # Signals may already be disconnected
+        
+        # Wait for thread to finish
+        if worker.isRunning():
+            worker.quit()  # Request graceful shutdown
+            if not worker.wait(5000):  # Wait up to 5 seconds
+                # If still running, try to terminate
+                worker.terminate()
+                worker.wait(2000)  # Wait a bit more
+        
+        # Schedule worker for deletion
+        worker.deleteLater()
         
         self.scan_stopped.emit()
     

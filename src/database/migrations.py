@@ -526,6 +526,24 @@ def migration_update_foreign_key_cascades(engine: Engine) -> None:
         conn.commit()
 
 
+def migration_add_timeline_markers(engine: Engine) -> None:
+    """Add timeline_markers column to projects table.
+    
+    Stores timeline markers (locators) extracted from .als files using dawtool.
+    Format: JSON array of objects with 'time' (float) and 'text' (string) fields.
+    """
+    with engine.connect() as conn:
+        # Check if column already exists
+        result = conn.execute(text("PRAGMA table_info(projects)"))
+        columns = [row[1] for row in result.fetchall()]
+        
+        if 'timeline_markers' not in columns:
+            conn.execute(text(
+                "ALTER TABLE projects ADD COLUMN timeline_markers TEXT DEFAULT '[]'"
+            ))
+            conn.commit()
+
+
 # Migration registry - add new migrations here
 # Each migration is a tuple of (version, description, function)
 # NOTE: Must be defined AFTER the migration functions
@@ -545,6 +563,7 @@ MIGRATIONS: List[tuple] = [
     (13, "Add composite indexes for common queries (Phase 1 & 2)", migration_add_composite_indexes),
     (14, "Create project_tags junction table and migrate tags (Phase 2)", migration_create_project_tags_table),
     (15, "Update foreign key cascade behaviors (Phase 2)", migration_update_foreign_key_cascades),
+    (16, "Add timeline_markers column to projects table", migration_add_timeline_markers),
 ]
 
 

@@ -299,6 +299,9 @@ class ScanWorker(QThread):
         project.scale_type = metadata.scale_type
         project.is_in_key = metadata.is_in_key
         
+        # Timeline markers (extracted using dawtool)
+        project.timeline_markers = json.dumps(metadata.timeline_markers) if metadata.timeline_markers else '[]'
+        
         # Note: export_song_name is NOT auto-populated during scanning.
         # Users can manually set it via the Properties view or use the "Suggest" button.
         # This avoids incorrectly using annotations (which are often notes/comments)
@@ -515,6 +518,7 @@ class ProjectScanner(QObject):
     def __init__(self, parent: Optional[QObject] = None, parse_metadata: bool = True):
         super().__init__(parent)
         
+        self.logger = get_logger(__name__)
         self._worker: Optional[ScanWorker] = None
         self._parse_metadata = parse_metadata
         self._exclude_patterns = [
@@ -568,22 +572,64 @@ class ProjectScanner(QObject):
     
     def _on_complete(self, count: int) -> None:
         """Handle scan completion."""
+        # Ensure thread has finished before cleaning up
+        worker = self._worker
         self._worker = None
+        
+        if worker:
+            # Disconnect all signals to prevent crashes if signals fire after cleanup
+            try:
+                worker.progress.disconnect()
+                worker.project_found.disconnect()
+                worker.scan_complete.disconnect()
+                worker.error.disconnect()
+            except (TypeError, RuntimeError):
+                pass  # Signals may already be disconnected
+            
+            # Wait for thread to finish if still running
+            if worker.isRunning():
+                worker.quit()  # Request graceful shutdown
+                if not worker.wait(2000):  # Wait up to 2 seconds
+                    self.logger.warning("Scan worker thread did not finish in time, terminating")
+                    worker.terminate()
+                    worker.wait(1000)
+            
+            # Schedule worker for deletion (Qt will clean it up)
+            worker.deleteLater()
+        
         self.scan_complete.emit(count)
     
     def stop(self) -> None:
         """Stop the current scan."""
-        if self._worker:
-            self._worker.stop()
-            if self._worker.isRunning():
-                # Wait for thread to finish
-                if not self._worker.wait(5000):  # Wait up to 5 seconds
-                    # If still running, try to terminate
-                    self._worker.terminate()
-                    self._worker.wait(2000)  # Wait a bit more
-            # Clean up worker
-            self._worker.deleteLater()
-            self._worker = None
+        if not self._worker:
+            return
+        
+        worker = self._worker
+        self._worker = None
+        
+        # Request stop
+        worker.stop()
+        
+        # Disconnect all signals to prevent crashes
+        try:
+            worker.progress.disconnect()
+            worker.project_found.disconnect()
+            worker.scan_complete.disconnect()
+            worker.error.disconnect()
+        except (TypeError, RuntimeError):
+            pass  # Signals may already be disconnected
+        
+        # Wait for thread to finish
+        if worker.isRunning():
+            worker.quit()  # Request graceful shutdown
+            if not worker.wait(5000):  # Wait up to 5 seconds
+                # If still running, try to terminate
+                self.logger.warning("Scan worker did not stop gracefully, terminating")
+                worker.terminate()
+                worker.wait(2000)  # Wait a bit more
+        
+        # Schedule worker for deletion
+        worker.deleteLater()
     
     def set_exclude_patterns(self, patterns: List[str]) -> None:
         """Set the exclude patterns for scanning.
@@ -623,10 +669,32 @@ class GlobalScanner(QObject):
     
     def stop(self) -> None:
         """Stop the current search."""
-        if self._worker:
-            self._worker.stop()
-            self._worker.wait(5000)
-            self._worker = None
+        if not self._worker:
+            return
+        
+        worker = self._worker
+        self._worker = None
+        
+        # Request stop
+        worker.stop()
+        
+        # Disconnect all signals to prevent crashes
+        try:
+            worker.progress.disconnect()
+            worker.project_found.disconnect()
+            worker.scan_complete.disconnect()
+        except (TypeError, RuntimeError):
+            pass  # Signals may already be disconnected
+        
+        # Wait for thread to finish
+        if worker.isRunning():
+            worker.quit()  # Request graceful shutdown
+            if not worker.wait(5000):  # Wait up to 5 seconds
+                worker.terminate()
+                worker.wait(2000)  # Wait a bit more
+        
+        # Schedule worker for deletion
+        worker.deleteLater()
 
 
 class GlobalScanWorker(QThread):
