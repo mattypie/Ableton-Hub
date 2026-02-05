@@ -1,10 +1,10 @@
 """UI controllers for managing application state and business logic."""
 
-from .scan_controller import ScanController
-from .project_controller import ProjectController
 from .collection_controller import CollectionController
 from .live_controller import LiveController
 from .location_controller import LocationController
+from .project_controller import ProjectController
+from .scan_controller import ScanController
 from .view_controller import ViewController
 
 __all__ = [

@@ -1,13 +1,13 @@
 """UI Widgets module - Reusable PyQt6 widget components."""
 
-from .sidebar import Sidebar
-from .project_grid import ProjectGrid
-from .project_card import ProjectCard
-from .location_panel import LocationPanel
 from .collection_view import CollectionView
-from .tag_editor import TagEditor
-from .search_bar import SearchBar
 from .link_panel import LinkPanel
+from .location_panel import LocationPanel
+from .project_card import ProjectCard
+from .project_grid import ProjectGrid
+from .search_bar import SearchBar
+from .sidebar import Sidebar
+from .tag_editor import TagEditor
 
 __all__ = [
     "Sidebar",

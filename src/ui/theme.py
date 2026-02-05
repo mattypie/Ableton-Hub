@@ -1,14 +1,14 @@
 """Theme system for Ableton Hub with multiple color schemes."""
 
-from typing import Optional, Dict
+from typing import cast
+
+from PyQt6.QtGui import QColor, QFont, QPalette
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QPalette, QColor, QFont
-from PyQt6.QtCore import Qt
 
 
 class ThemeColors:
     """Base color scheme definitions."""
-    
+
     # Orange theme (Ableton default)
     ORANGE = {
         "background": "#1e1e1e",
@@ -39,7 +39,7 @@ class ThemeColors:
         "scrollbar": "#4a4a4a",
         "scrollbar_hover": "#5a5a5a",
     }
-    
+
     # Blue theme
     BLUE = {
         "background": "#1a1f2e",
@@ -70,7 +70,7 @@ class ThemeColors:
         "scrollbar": "#475263",
         "scrollbar_hover": "#556373",
     }
-    
+
     # Green theme
     GREEN = {
         "background": "#1e241e",
@@ -101,7 +101,7 @@ class ThemeColors:
         "scrollbar": "#4a5a4a",
         "scrollbar_hover": "#5a6a5a",
     }
-    
+
     # Pink theme (vibrant pink accent)
     PINK = {
         "background": "#1a1a1a",
@@ -121,11 +121,11 @@ class ThemeColors:
         "border_focus": "#ff6b9d",
         "success": "#4caf50",  # Bright green
         "warning": "#ffc107",  # Amber
-        "error": "#f44336",    # Red
-        "info": "#2196f3",      # Blue
+        "error": "#f44336",  # Red
+        "info": "#2196f3",  # Blue
         "local": "#4caf50",
         "network": "#2196f3",
-        "cloud": "#9c27b0",     # Purple
+        "cloud": "#9c27b0",  # Purple
         "offline": "#707070",
         "selection": "#ff6b9d40",
         "selection_inactive": "#3d3d3d",
@@ -136,7 +136,7 @@ class ThemeColors:
 
 class AbletonTheme:
     """Theme manager with support for multiple color schemes."""
-    
+
     THEMES = {
         "orange": ThemeColors.ORANGE,
         "blue": ThemeColors.BLUE,
@@ -146,17 +146,17 @@ class AbletonTheme:
         "cool_blue": ThemeColors.BLUE,
         "rainbow": ThemeColors.PINK,
     }
-    
+
     THEME_NAMES = {
         "orange": "Orange (Ableton)",
         "blue": "Blue",
         "green": "Green",
         "pink": "Pink",
     }
-    
+
     # Backward compatibility: class-level COLORS points to default theme
     COLORS = THEMES["orange"]
-    
+
     # Font settings (shared across all themes)
     FONTS = {
         "family": "Segoe UI, SF Pro Display, -apple-system, sans-serif",
@@ -166,10 +166,10 @@ class AbletonTheme:
         "size_title": 18,
         "size_header": 24,
     }
-    
+
     def __init__(self, theme_name: str = "orange"):
         """Initialize the theme.
-        
+
         Args:
             theme_name: Name of the theme to use ("orange", "blue", "green", "pink").
         """
@@ -177,24 +177,24 @@ class AbletonTheme:
         self.COLORS = self.THEMES.get(theme_name, self.THEMES["orange"])
         self._stylesheet: str = ""
         self._build_stylesheet()
-    
+
     @classmethod
-    def get_available_themes(cls) -> Dict[str, str]:
+    def get_available_themes(cls) -> dict[str, str]:
         """Get available theme names and display names.
-        
+
         Returns:
             Dictionary mapping theme IDs to display names.
         """
         return cls.THEME_NAMES.copy()
-    
+
     @classmethod
-    def get_color(cls, name: str, theme_name: Optional[str] = None) -> str:
+    def get_color(cls, name: str, theme_name: str | None = None) -> str:
         """Get a color value by name.
-        
+
         Args:
             name: Color name from COLORS dict.
             theme_name: Optional theme name, uses default if not provided.
-            
+
         Returns:
             Hex color string.
         """
@@ -203,42 +203,43 @@ class AbletonTheme:
         else:
             colors = cls.THEMES["orange"]
         return colors.get(name, "#ffffff")
-    
+
     @classmethod
-    def get_qcolor(cls, name: str, theme_name: Optional[str] = None) -> QColor:
+    def get_qcolor(cls, name: str, theme_name: str | None = None) -> QColor:
         """Get a QColor by name.
-        
+
         Args:
             name: Color name from COLORS dict.
             theme_name: Optional theme name, uses default if not provided.
-            
+
         Returns:
             QColor object.
         """
         return QColor(cls.get_color(name, theme_name))
-    
+
     def apply(self, app: QApplication) -> None:
         """Apply the theme to the application.
-        
+
         Args:
             app: QApplication instance.
         """
         # Set the palette
         palette = self._create_palette()
         app.setPalette(palette)
-        
+
         # Set the stylesheet
         app.setStyleSheet(self._stylesheet)
-        
+
         # Set default font
-        font_family = self.FONTS["family"].split(",")[0].strip()
+        font_family = str(self.FONTS["family"]).split(",")[0].strip()
         font = QFont(font_family)
         if font.pointSize() <= 0:
             font = QFont()
-        
+
         if font.pointSize() > 0 or font.pixelSize() > 0:
             try:
-                font.setPointSize(self.FONTS["size_normal"])
+                size_normal = int(cast(int, self.FONTS["size_normal"]))
+                font.setPointSize(size_normal)
                 if font.pointSize() <= 0:
                     font.setPixelSize(12)
             except (ValueError, TypeError):
@@ -246,47 +247,47 @@ class AbletonTheme:
         else:
             font.setPixelSize(12)
         app.setFont(font)
-    
+
     def _create_palette(self) -> QPalette:
         """Create a QPalette with the theme colors."""
         palette = QPalette()
         c = self.COLORS
-        
+
         # Window colors
         palette.setColor(QPalette.ColorRole.Window, QColor(c["background"]))
         palette.setColor(QPalette.ColorRole.WindowText, QColor(c["text_primary"]))
-        
+
         # Base colors (for inputs, lists)
         palette.setColor(QPalette.ColorRole.Base, QColor(c["surface"]))
         palette.setColor(QPalette.ColorRole.AlternateBase, QColor(c["surface_light"]))
-        
+
         # Text colors
         palette.setColor(QPalette.ColorRole.Text, QColor(c["text_primary"]))
         palette.setColor(QPalette.ColorRole.PlaceholderText, QColor(c["text_disabled"]))
-        
+
         # Button colors
         palette.setColor(QPalette.ColorRole.Button, QColor(c["surface"]))
         palette.setColor(QPalette.ColorRole.ButtonText, QColor(c["text_primary"]))
-        
+
         # Highlight colors
         palette.setColor(QPalette.ColorRole.Highlight, QColor(c["accent"]))
         palette.setColor(QPalette.ColorRole.HighlightedText, QColor(c["text_on_accent"]))
-        
+
         # Tool tips
         palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(c["surface_light"]))
         palette.setColor(QPalette.ColorRole.ToolTipText, QColor(c["text_primary"]))
-        
+
         # Links
         palette.setColor(QPalette.ColorRole.Link, QColor(c["accent"]))
         palette.setColor(QPalette.ColorRole.LinkVisited, QColor(c["accent_pressed"]))
-        
+
         return palette
-    
+
     def _build_stylesheet(self) -> None:
         """Build the complete QSS stylesheet."""
         c = self.COLORS
         f = self.FONTS
-        
+
         self._stylesheet = f"""
         /* Global styles */
         QWidget {{
@@ -781,24 +782,28 @@ class AbletonTheme:
             font-weight: bold;
         }}
         """
-    
+
     @staticmethod
-    def safe_font_modify(font: QFont, point_size: Optional[int] = None, 
-                         pixel_size: Optional[int] = None, bold: bool = False) -> QFont:
+    def safe_font_modify(
+        font: QFont,
+        point_size: int | None = None,
+        pixel_size: int | None = None,
+        bold: bool = False,
+    ) -> QFont:
         """Safely modify a font, handling invalid point sizes.
-        
+
         Args:
             font: The font to modify.
             point_size: Optional point size to set.
             pixel_size: Optional pixel size to set (used if point_size is invalid).
             bold: Whether to make the font bold.
-            
+
         Returns:
             Modified QFont object.
         """
         if bold:
             font.setBold(True)
-        
+
         if point_size is not None:
             if font.pointSize() > 0:
                 try:
@@ -818,5 +823,5 @@ class AbletonTheme:
                     font.setPixelSize(pixel_size)
         elif pixel_size is not None:
             font.setPixelSize(pixel_size)
-        
+
         return font

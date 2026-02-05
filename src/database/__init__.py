@@ -1,21 +1,21 @@
 """Database module - SQLAlchemy models and session management."""
 
-from .db import get_engine, get_session, init_database, close_database, reset_database
+from .db import close_database, get_engine, get_session, init_database, reset_database
 from .models import (
+    AppSettings,
     Base,
-    Project,
-    Location,
-    Tag,
-    ProjectTag,
     Collection,
-    ProjectCollection,
+    CollectionType,
     Export,
     LinkDevice,
     LiveInstallation,
-    AppSettings,
+    Location,
     LocationType,
+    Project,
+    ProjectCollection,
     ProjectStatus,
-    CollectionType,
+    ProjectTag,
+    Tag,
 )
 
 __all__ = [

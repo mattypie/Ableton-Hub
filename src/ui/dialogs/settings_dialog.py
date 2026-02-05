@@ -1,14 +1,25 @@
 """Settings dialog for Ableton Hub."""
 
-from typing import Optional
 from pathlib import Path
+
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTabWidget, QWidget, QSpinBox, QCheckBox, QGroupBox,
-    QFileDialog, QLineEdit, QMessageBox, QRadioButton, QButtonGroup,
-    QComboBox
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QRadioButton,
+    QSpinBox,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt
 
 from ...config import Config, save_config
 from ...utils.logging import get_logs_directory
@@ -17,10 +28,10 @@ from ..theme import AbletonTheme
 
 class SettingsDialog(QDialog):
     """Settings dialog for application configuration."""
-    
-    def __init__(self, config: Config, parent: Optional[QWidget] = None):
+
+    def __init__(self, config: Config, parent: QWidget | None = None):
         """Initialize the settings dialog.
-        
+
         Args:
             config: Application configuration object.
             parent: Parent widget.
@@ -28,73 +39,73 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.config = config
         self._setup_ui()
-    
+
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""
         self.setWindowTitle("Settings")
         self.setMinimumSize(600, 500)
-        
+
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
-        
+
         # Tab widget for different settings categories
         tabs = QTabWidget()
-        
+
         # General tab
         general_tab = self._create_general_tab()
         tabs.addTab(general_tab, "General")
-        
+
         # Scanning tab
         scanning_tab = self._create_scanning_tab()
         tabs.addTab(scanning_tab, "Scanning")
-        
+
         # Export tab
         export_tab = self._create_export_tab()
         tabs.addTab(export_tab, "Exports")
-        
+
         # Link tab
         link_tab = self._create_link_tab()
         tabs.addTab(link_tab, "Link")
-        
+
         # Logging tab
         logging_tab = self._create_logging_tab()
         tabs.addTab(logging_tab, "Logging")
-        
+
         layout.addWidget(tabs)
-        
+
         # Buttons
         buttons = QHBoxLayout()
         buttons.addStretch()
-        
+
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
         buttons.addWidget(cancel_btn)
-        
+
         ok_btn = QPushButton("OK")
         ok_btn.setDefault(True)
         ok_btn.clicked.connect(self._on_ok)
         buttons.addWidget(ok_btn)
-        
+
         layout.addLayout(buttons)
-    
+
     def _create_general_tab(self) -> QWidget:
         """Create the general settings tab."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(12)
-        
+
         # Theme selection
         theme_group = QGroupBox("Color Theme")
         theme_layout = QVBoxLayout(theme_group)
-        
+
         self.theme_group = QButtonGroup(self)
         available_themes = AbletonTheme.get_available_themes()
-        
+
         # Get current theme (handle legacy "dark" theme)
-        current_theme = getattr(self.config.ui, 'theme', 'orange')
+        current_theme = getattr(self.config.ui, "theme", "orange")
         if current_theme == "dark":
             current_theme = "orange"
-        
+
         # Map theme IDs to radio buttons
         self.theme_radios = {}
         for idx, (theme_id, theme_name) in enumerate(available_themes.items()):
@@ -103,18 +114,18 @@ class SettingsDialog(QDialog):
             self.theme_group.addButton(radio, idx)
             self.theme_radios[theme_id] = radio
             theme_layout.addWidget(radio)
-        
+
         layout.addWidget(theme_group)
-        
+
         # Waveform color mode selection
         waveform_group = QGroupBox("Waveform Color Gradient")
         waveform_layout = QVBoxLayout(waveform_group)
-        
+
         self.waveform_group = QButtonGroup(self)
-        
+
         # Get current waveform color mode
-        current_waveform_mode = getattr(self.config.ui, 'waveform_color_mode', 'rainbow')
-        
+        current_waveform_mode = getattr(self.config.ui, "waveform_color_mode", "rainbow")
+
         # Waveform color mode options (gradients only, solid colors disabled)
         waveform_modes = {
             "rainbow": "Rainbow",
@@ -127,9 +138,9 @@ class SettingsDialog(QDialog):
             "yellow_green": "Yellow → Green",
             "magenta_pink": "Magenta → Pink",
             "cyan_green": "Cyan → Green",
-            "random": "Random (Per Project, Changes on Rescan)"
+            "random": "Random (Per Project, Changes on Rescan)",
         }
-        
+
         self.waveform_radios = {}
         for idx, (mode_id, mode_name) in enumerate(waveform_modes.items()):
             radio = QRadioButton(mode_name)
@@ -137,7 +148,7 @@ class SettingsDialog(QDialog):
             self.waveform_group.addButton(radio, idx)
             self.waveform_radios[mode_id] = radio
             waveform_layout.addWidget(radio)
-        
+
         # Info label
         info_text = (
             "Note: Existing thumbnails will keep their current colors.\n"
@@ -148,57 +159,57 @@ class SettingsDialog(QDialog):
         info_label.setWordWrap(True)
         info_label.setStyleSheet("color: #888; font-size: 10px;")
         waveform_layout.addWidget(info_label)
-        
+
         layout.addWidget(waveform_group)
-        
+
         # View settings
         view_group = QGroupBox("Default View")
         view_layout = QVBoxLayout(view_group)
-        
+
         self.view_group = QButtonGroup(self)
         self.grid_radio = QRadioButton("Grid View")
         self.grid_radio.setChecked(self.config.ui.default_view == "grid")
         self.view_group.addButton(self.grid_radio, 0)
         view_layout.addWidget(self.grid_radio)
-        
+
         self.list_radio = QRadioButton("List View")
         self.list_radio.setChecked(self.config.ui.default_view == "list")
         self.view_group.addButton(self.list_radio, 1)
         view_layout.addWidget(self.list_radio)
-        
+
         layout.addWidget(view_group)
-        
+
         # Other settings
         other_group = QGroupBox("Other")
         other_layout = QVBoxLayout(other_group)
-        
+
         self.confirm_delete = QCheckBox("Confirm before deleting")
         self.confirm_delete.setChecked(self.config.ui.confirm_delete)
         other_layout.addWidget(self.confirm_delete)
-        
+
         self.show_status_bar = QCheckBox("Show status bar")
         self.show_status_bar.setChecked(self.config.ui.show_status_bar)
         other_layout.addWidget(self.show_status_bar)
-        
+
         layout.addWidget(other_group)
-        
+
         layout.addStretch()
         return widget
-    
+
     def _create_scanning_tab(self) -> QWidget:
         """Create the scanning settings tab."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(12)
-        
+
         # Auto-scan settings
         auto_group = QGroupBox("Auto-Scanning")
         auto_layout = QVBoxLayout(auto_group)
-        
+
         self.auto_scan_startup = QCheckBox("Scan on startup")
         self.auto_scan_startup.setChecked(self.config.scan.auto_scan_on_startup)
         auto_layout.addWidget(self.auto_scan_startup)
-        
+
         # Scan frequency
         freq_layout = QHBoxLayout()
         freq_layout.addWidget(QLabel("Scan frequency (hours):"))
@@ -208,7 +219,7 @@ class SettingsDialog(QDialog):
         freq_layout.addWidget(self.scan_frequency)
         freq_layout.addStretch()
         auto_layout.addLayout(freq_layout)
-        
+
         # Recursive depth
         depth_layout = QHBoxLayout()
         depth_layout.addWidget(QLabel("Recursive depth:"))
@@ -218,42 +229,42 @@ class SettingsDialog(QDialog):
         depth_layout.addWidget(self.recursive_depth)
         depth_layout.addStretch()
         auto_layout.addLayout(depth_layout)
-        
+
         layout.addWidget(auto_group)
-        
+
         # Exclude patterns
         exclude_group = QGroupBox("Exclude Patterns")
         exclude_layout = QVBoxLayout(exclude_group)
-        
+
         exclude_info = QLabel("Patterns to exclude from scanning (one per line):")
         exclude_info.setWordWrap(True)
         exclude_layout.addWidget(exclude_info)
-        
+
         self.exclude_patterns = QLineEdit()
         self.exclude_patterns.setPlaceholderText("**/Backup/**, **/.git/**, etc.")
         if self.config.scan.exclude_patterns:
             self.exclude_patterns.setText(", ".join(self.config.scan.exclude_patterns))
         exclude_layout.addWidget(self.exclude_patterns)
-        
+
         layout.addWidget(exclude_group)
-        
+
         layout.addStretch()
         return widget
-    
+
     def _create_export_tab(self) -> QWidget:
         """Create the export settings tab."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(12)
-        
+
         # Auto-detect
         detect_group = QGroupBox("Export Detection")
         detect_layout = QVBoxLayout(detect_group)
-        
+
         self.auto_detect_exports = QCheckBox("Automatically detect exports")
         self.auto_detect_exports.setChecked(self.config.export.auto_detect_exports)
         detect_layout.addWidget(self.auto_detect_exports)
-        
+
         # Fuzzy match threshold
         threshold_layout = QHBoxLayout()
         threshold_layout.addWidget(QLabel("Fuzzy match threshold:"))
@@ -264,26 +275,26 @@ class SettingsDialog(QDialog):
         threshold_layout.addWidget(self.fuzzy_threshold)
         threshold_layout.addStretch()
         detect_layout.addLayout(threshold_layout)
-        
+
         layout.addWidget(detect_group)
-        
+
         layout.addStretch()
         return widget
-    
+
     def _create_link_tab(self) -> QWidget:
         """Create the Link settings tab."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(12)
-        
+
         # Link settings
         link_group = QGroupBox("Ableton Link")
         link_layout = QVBoxLayout(link_group)
-        
+
         self.link_enabled = QCheckBox("Enable Ableton Link")
         self.link_enabled.setChecked(self.config.link.enabled)
         link_layout.addWidget(self.link_enabled)
-        
+
         # Scan interval
         interval_layout = QHBoxLayout()
         interval_layout.addWidget(QLabel("Scan interval (seconds):"))
@@ -293,31 +304,31 @@ class SettingsDialog(QDialog):
         interval_layout.addWidget(self.scan_interval)
         interval_layout.addStretch()
         link_layout.addLayout(interval_layout)
-        
+
         # Show offline devices
         self.show_offline = QCheckBox("Show offline devices")
         self.show_offline.setChecked(self.config.link.show_offline_devices)
         link_layout.addWidget(self.show_offline)
-        
+
         layout.addWidget(link_group)
-        
+
         layout.addStretch()
         return widget
-    
+
     def _create_logging_tab(self) -> QWidget:
         """Create the logging settings tab."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
         layout.setSpacing(12)
-        
+
         # File logging settings
         file_group = QGroupBox("File Logging")
         file_layout = QVBoxLayout(file_group)
-        
+
         self.logging_enabled = QCheckBox("Enable file logging")
         self.logging_enabled.setChecked(self.config.logging.enabled)
         file_layout.addWidget(self.logging_enabled)
-        
+
         # Log level
         level_layout = QHBoxLayout()
         level_layout.addWidget(QLabel("Log level:"))
@@ -332,13 +343,13 @@ class SettingsDialog(QDialog):
         level_layout.addWidget(self.log_level_combo)
         level_layout.addStretch()
         file_layout.addLayout(level_layout)
-        
+
         layout.addWidget(file_group)
-        
+
         # Log file settings
         file_settings_group = QGroupBox("Log File Settings")
         file_settings_layout = QVBoxLayout(file_settings_group)
-        
+
         # Log directory
         dir_layout = QHBoxLayout()
         dir_layout.addWidget(QLabel("Log directory:"))
@@ -351,12 +362,12 @@ class SettingsDialog(QDialog):
             self.log_dir_edit.setText(str(default_dir))
             self.log_dir_edit.setPlaceholderText(f"Default: {default_dir}")
         dir_layout.addWidget(self.log_dir_edit)
-        
+
         browse_btn = QPushButton("Browse...")
         browse_btn.clicked.connect(self._browse_log_directory)
         dir_layout.addWidget(browse_btn)
         file_settings_layout.addLayout(dir_layout)
-        
+
         # Current log file location (read-only)
         current_log_label = QLabel()
         current_log_path = get_logs_directory(self.config.logging) / "ableton_hub.log"
@@ -364,7 +375,7 @@ class SettingsDialog(QDialog):
         current_log_label.setWordWrap(True)
         current_log_label.setStyleSheet("color: #888; font-size: 10px;")
         file_settings_layout.addWidget(current_log_label)
-        
+
         # Max file size
         size_layout = QHBoxLayout()
         size_layout.addWidget(QLabel("Max file size (MB):"))
@@ -374,7 +385,7 @@ class SettingsDialog(QDialog):
         size_layout.addWidget(self.max_file_size)
         size_layout.addStretch()
         file_settings_layout.addLayout(size_layout)
-        
+
         # Backup count
         backup_layout = QHBoxLayout()
         backup_layout.addWidget(QLabel("Number of backup files:"))
@@ -384,7 +395,7 @@ class SettingsDialog(QDialog):
         backup_layout.addWidget(self.backup_count)
         backup_layout.addStretch()
         file_settings_layout.addLayout(backup_layout)
-        
+
         # Info label
         info_label = QLabel(
             "Note: Changes to logging settings require restarting the application to take effect.\n\n"
@@ -394,24 +405,21 @@ class SettingsDialog(QDialog):
         info_label.setWordWrap(True)
         info_label.setStyleSheet("color: #888; font-size: 10px;")
         file_settings_layout.addWidget(info_label)
-        
+
         layout.addWidget(file_settings_group)
-        
+
         layout.addStretch()
         return widget
-    
+
     def _browse_log_directory(self) -> None:
         """Browse for log directory."""
         current_dir = self.log_dir_edit.text() or str(get_logs_directory())
         directory = QFileDialog.getExistingDirectory(
-            self,
-            "Select Log Directory",
-            current_dir,
-            QFileDialog.Option.ShowDirsOnly
+            self, "Select Log Directory", current_dir, QFileDialog.Option.ShowDirsOnly
         )
         if directory:
             self.log_dir_edit.setText(directory)
-    
+
     def _on_ok(self) -> None:
         """Handle OK button click - save settings."""
         # Theme selection
@@ -419,45 +427,45 @@ class SettingsDialog(QDialog):
             if radio.isChecked():
                 self.config.ui.theme = theme_id
                 break
-        
+
         # Waveform color mode selection
         for mode_id, radio in self.waveform_radios.items():
             if radio.isChecked():
                 self.config.ui.waveform_color_mode = mode_id
                 break
-        
+
         # General settings
         if self.grid_radio.isChecked():
             self.config.ui.default_view = "grid"
         elif self.list_radio.isChecked():
             self.config.ui.default_view = "list"
-        
+
         self.config.ui.confirm_delete = self.confirm_delete.isChecked()
         self.config.ui.show_status_bar = self.show_status_bar.isChecked()
-        
+
         # Scanning settings
         self.config.scan.auto_scan_on_startup = self.auto_scan_startup.isChecked()
         self.config.scan.scan_frequency_hours = self.scan_frequency.value()
         self.config.scan.recursive_depth = self.recursive_depth.value()
-        
+
         # Parse exclude patterns
         patterns_text = self.exclude_patterns.text().strip()
         if patterns_text:
             # Split by comma or newline
-            patterns = [p.strip() for p in patterns_text.replace('\n', ',').split(',') if p.strip()]
+            patterns = [p.strip() for p in patterns_text.replace("\n", ",").split(",") if p.strip()]
             self.config.scan.exclude_patterns = patterns
         else:
             self.config.scan.exclude_patterns = []
-        
+
         # Export settings
         self.config.export.auto_detect_exports = self.auto_detect_exports.isChecked()
         self.config.export.fuzzy_match_threshold = float(self.fuzzy_threshold.value())
-        
+
         # Link settings
         self.config.link.enabled = self.link_enabled.isChecked()
         self.config.link.scan_interval_seconds = self.scan_interval.value()
         self.config.link.show_offline_devices = self.show_offline.isChecked()
-        
+
         # Logging settings
         self.config.logging.enabled = self.logging_enabled.isChecked()
         self.config.logging.level = self.log_level_combo.currentText()
@@ -469,24 +477,24 @@ class SettingsDialog(QDialog):
             self.config.logging.log_dir = None
         self.config.logging.max_bytes = self.max_file_size.value() * 1024 * 1024
         self.config.logging.backup_count = self.backup_count.value()
-        
+
         # Check if logging settings changed
         logging_changed = (
-            self.logging_enabled.isChecked() != self.config.logging.enabled or
-            self.log_level_combo.currentText() != self.config.logging.level or
-            (log_dir_text and log_dir_text != str(get_logs_directory(self.config.logging)))
+            self.logging_enabled.isChecked() != self.config.logging.enabled
+            or self.log_level_combo.currentText() != self.config.logging.level
+            or (log_dir_text and log_dir_text != str(get_logs_directory(self.config.logging)))
         )
-        
+
         # Save configuration
         save_config()
-        
+
         # Warn if logging settings changed
         if logging_changed:
             QMessageBox.information(
                 self,
                 "Restart Required",
                 "Logging settings have been saved.\n\n"
-                "Please restart the application for the changes to take effect."
+                "Please restart the application for the changes to take effect.",
             )
-        
+
         self.accept()

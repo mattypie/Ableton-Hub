@@ -4,7 +4,7 @@
 
 # Ableton Hub
 
-**Version 1.0.3**
+**Version 1.0.4**
 
 ## What is Ableton Hub?
 
@@ -203,8 +203,6 @@ Built with Python (programming language) and PyQt6 (GUI framework), Ableton Hub 
   - ableton-copilot-mcp (GitHub)
   - Live control via MCP documentation and resources
 
-
-
 #### User Interface
 - **Multiple Themes**: Choose from Orange (default), Blue, Green, or Pink themes inspired by Ableton Live's aesthetic
 - **Grid & List Views**: Toggle between grid and list views for projects
@@ -224,32 +222,38 @@ Built with Python (programming language) and PyQt6 (GUI framework), Ableton Hub 
 
 #### Enhanced Logging & Diagnostics
 - **Comprehensive Logging System**: Built-in logging infrastructure for troubleshooting and debugging
-  - **File-based Logging**: Automatic log file creation with rotation (10MB files, 5 backups)
-  - **Separate Error Log**: Dedicated error log file for quick problem identification
   - **Configurable Log Levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL (defaults to ERROR for production)
   - **Development Mode**: Automatically switches to DEBUG level when running from source
   - **Log Viewer**: Built-in log viewer accessible from Help menu to view recent logs without leaving the app
-  - **Settings Integration**: Configure logging preferences (level, file location, rotation settings) in Settings dialog
-  - **Global Exception Handling**: Unhandled exceptions are automatically logged with full tracebacks
-  - **Qt Message Integration**: Qt warnings and errors routed through Python logging for unified error tracking
-  - **Context-Rich Error Logging**: Worker threads and operations include contextual information (project IDs, file paths, etc.) in error logs
 - **Log File Locations**: 
   - Windows: `%APPDATA%\AbletonHub\logs\`
   - macOS: `~/Library/Application Support/AbletonHub/logs/`
   - Linux: `~/.local/share/AbletonHub/logs/`
 
-#### Performance Optimizations
-- **Database Optimizations**:
-  - **SQLite WAL Mode**: Write-Ahead Logging for better concurrent access and performance
-  - **Optimized Cache**: 64MB SQLite cache for faster query performance
-  - **Strategic Indexes**: Composite indexes on common query patterns (location+status, favorite+modified, etc.)
-  - **Query Optimization**: Indexed columns for fast filtering and sorting operations
-- **GUI Widget Optimizations**:
-  - **Modular Architecture**: MainWindow refactored into specialized managers (ViewManager, MenuBarManager, ToolBarManager)
-  - **Background Processing**: Heavy operations moved to worker threads to keep UI responsive
-  - **Efficient Signal Management**: Proper signal disconnection and cleanup to prevent memory leaks
-  - **Lazy Loading**: Resources loaded on-demand to improve startup time
-  - **Widget Lifecycle Management**: Proper cleanup and bounds checking to prevent crashes
+## 🎯 First Time Setup
+
+New to Ableton Hub? Check out the **[First Time Setup Guide](docs/FIRST_TIME_SETUP.md)** for a detailed walkthrough of what to expect on your first launch and how to get started.
+
+**Quick Overview:**
+1. **Launch the application** using one of the installation methods above
+2. **Add your first location**:
+   - Click "Add Location" in the sidebar
+   - Select a folder containing Ableton projects
+   - Choose location type (Local, Network, Cloud, etc.)
+3. **Scan for projects**:
+   - Click the "Scan" button in the toolbar
+   - Wait for the scan to complete (this may take a few minutes depending on how many projects you have)
+   - Projects will appear in the main view
+4. **Explore your projects**:
+   - Double-click any project to open it in Ableton Live
+   - Use the search bar to find projects by name, tempo, or plugins
+   - Click project cards to see details and play exports
+
+**Next Steps:**
+- Create collections to organize related projects
+- Add tags to categorize your projects
+- Explore the search and filtering options
+- Check out the Health Dashboard to see project statistics
 
 ## 🏗️ System Architecture
 
@@ -462,30 +466,7 @@ These guides include:
 - How to verify your installation worked
 - Common issues and solutions
 
-## 🎯 First Time Setup
 
-New to Ableton Hub? Check out the **[First Time Setup Guide](docs/FIRST_TIME_SETUP.md)** for a detailed walkthrough of what to expect on your first launch and how to get started.
-
-**Quick Overview:**
-1. **Launch the application** using one of the installation methods above
-2. **Add your first location**:
-   - Click "Add Location" in the sidebar
-   - Select a folder containing Ableton projects
-   - Choose location type (Local, Network, Cloud, etc.)
-3. **Scan for projects**:
-   - Click the "Scan" button in the toolbar
-   - Wait for the scan to complete (this may take a few minutes depending on how many projects you have)
-   - Projects will appear in the main view
-4. **Explore your projects**:
-   - Double-click any project to open it in Ableton Live
-   - Use the search bar to find projects by name, tempo, or plugins
-   - Click project cards to see details and play exports
-
-**Next Steps:**
-- Create collections to organize related projects
-- Add tags to categorize your projects
-- Explore the search and filtering options
-- Check out the Health Dashboard to see project statistics
 
 ## 📚 Additional Resources
 

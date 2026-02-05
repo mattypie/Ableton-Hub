@@ -1,7 +1,7 @@
 """Main entry point for Ableton Hub application."""
 
-import sys
 import os
+import sys
 
 # Ensure the src package is importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

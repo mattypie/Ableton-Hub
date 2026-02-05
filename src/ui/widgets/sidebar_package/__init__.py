@@ -9,12 +9,12 @@ file is still being used. The section modules are stubs for future implementatio
 
 # Section modules are available but not required for current functionality
 try:
-    from .navigation_section import NavigationSection
-    from .locations_section import LocationsSection
-    from .collections_section import CollectionsSection
-    from .tags_section import TagsSection
-    from .live_section import LiveSection
     from .backups_section import BackupsSection
+    from .collections_section import CollectionsSection
+    from .live_section import LiveSection
+    from .locations_section import LocationsSection
+    from .navigation_section import NavigationSection
+    from .tags_section import TagsSection
 except ImportError:
     # If sections don't exist yet, that's okay
     NavigationSection = None

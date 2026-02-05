@@ -116,6 +116,8 @@ ruff check src tests --fix
 
 ## Testing
 
+### Running Tests
+
 Run the test suite:
 
 ```bash
@@ -127,6 +129,34 @@ Run tests with coverage:
 ```bash
 pytest --cov=src --cov-report=html
 ```
+
+### Pre-Release Validation
+
+Before every new version release, run the comprehensive release validation to ensure functionality:
+
+```bash
+# Run full release validation (recommended before release)
+python tests/test_release.py --verbose
+
+# Windows (using batch file)
+test_release.bat --verbose
+
+# Skip code quality checks (faster)
+python tests/test_release.py --skip-code-quality
+
+# Skip ML tests (faster, less comprehensive)
+python tests/test_release.py --skip-ml
+```
+
+The release validation validates:
+- ✅ Code quality (ruff, mypy, black)
+- ✅ All unit tests pass
+- ✅ Core functionality (imports, database, scanner)
+- ✅ Deep extraction (parser, plugins, devices, tempo, key, markers)
+- ✅ ML features (feature extraction, similarity, clustering)
+- ✅ Live 12 compatibility
+
+The release validation script is located at `tests/test_release.py` and can be run directly.
 
 ## Architecture
 

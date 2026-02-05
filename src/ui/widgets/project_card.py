@@ -1,60 +1,58 @@
 """Project card widget for grid view."""
 
-from typing import Optional, List
 from datetime import datetime
 from pathlib import Path
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QMenu
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QMouseEvent, QContextMenuEvent, QColor, QPainter, QPen, QPixmap
 
-from ...database.models import Project, ProjectStatus, Export
-from ...services.audio_preview import AudioPreviewGenerator
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QContextMenuEvent, QMouseEvent, QPixmap
+from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+
+from ...database.models import Export, Project, ProjectStatus
 from ...services.audio_player import AudioPlayer
+from ...services.audio_preview import AudioPreviewGenerator
 from ..theme import AbletonTheme
 
 
 class ProjectCard(QFrame):
     """Card widget representing a single project."""
-    
+
     # Signals
-    clicked = pyqtSignal(int)          # Project ID
-    double_clicked = pyqtSignal(int)   # Project ID
+    clicked = pyqtSignal(int)  # Project ID
+    double_clicked = pyqtSignal(int)  # Project ID
     context_menu = pyqtSignal(int, object)  # Project ID, QPoint
     export_playing = pyqtSignal(int, str)  # Project ID, Export path
-    
-    def __init__(self, project: Project, parent: Optional[QWidget] = None):
+
+    def __init__(self, project: Project, parent: QWidget | None = None):
         super().__init__(parent)
-        
+
         self.project = project
         self._selected = False
-        
+
         # Export playback state
-        self._exports: List[Export] = []
+        self._exports: list[Export] = []
         self._current_export_index = 0
         self._load_exports()
-        
+
         # Audio player instance
         self._audio_player = AudioPlayer.instance()
         self._audio_player.playback_finished.connect(self._on_playback_finished)
         self._audio_player.playback_stopped.connect(self._on_playback_stopped)
-        
+
         self._setup_ui()
         self._update_display()
-    
+
     def _setup_ui(self) -> None:
         """Set up the card UI."""
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setFixedSize(180, 140)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        
+
         self._apply_style()
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(6)
-        
+
         # Preview thumbnail
         self.preview_label = QLabel()
         self.preview_label.setFixedSize(156, 60)
@@ -67,12 +65,12 @@ class ProjectCard(QFrame):
         """)
         # Tooltip will be set in _update_display
         layout.addWidget(self.preview_label)
-        
+
         # Project name row (centered) with favorite indicator
         name_row = QHBoxLayout()
         name_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         name_row.setSpacing(4)
-        
+
         self.name_label = QLabel()
         self.name_label.setWordWrap(True)
         self.name_label.setMaximumHeight(40)
@@ -86,63 +84,79 @@ class ProjectCard(QFrame):
         self.name_label.setFont(font)
         # Tooltip will be set in _update_display
         name_row.addWidget(self.name_label)
-        
+
         # Favorite indicator (gemstone icon) next to title
         self.favorite_indicator = QLabel()
-        self.favorite_indicator.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 12px;")
+        self.favorite_indicator.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 12px;"
+        )
         name_row.addWidget(self.favorite_indicator)
-        
+
         layout.addLayout(name_row)
-        
+
         # Parent folder label (shown when folder name differs from project name)
         self.folder_label = QLabel()
         self.folder_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.folder_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 9px; font-style: italic;")
+        self.folder_label.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 9px; font-style: italic;"
+        )
         self.folder_label.setVisible(False)
         layout.addWidget(self.folder_label)
-        
+
         layout.addStretch()
-        
+
         # Tempo row (centered)
         tempo_row = QHBoxLayout()
         tempo_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         tempo_row.setSpacing(2)
-        
+
         self.bpm_label = QLabel("bpm")
-        self.bpm_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;")
+        self.bpm_label.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;"
+        )
         tempo_row.addWidget(self.bpm_label)
-        
+
         self.tempo_label = QLabel()
         tempo_row.addWidget(self.tempo_label)
-        
+
         self.tempo_sep = QLabel("|")
-        self.tempo_sep.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px; padding: 0 4px;")
+        self.tempo_sep.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px; padding: 0 4px;"
+        )
         tempo_row.addWidget(self.tempo_sep)
-        
+
         self.length_label = QLabel()
-        self.length_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;")
+        self.length_label.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;"
+        )
         tempo_row.addWidget(self.length_label)
-        
+
         self.duration_label = QLabel()
-        self.duration_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px; padding-left: 4px;")
+        self.duration_label.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px; padding-left: 4px;"
+        )
         tempo_row.addWidget(self.duration_label)
-        
+
         layout.addLayout(tempo_row)
-        
+
         # Bottom row (centered with similarity indicator at far right)
         bottom_row = QHBoxLayout()
         bottom_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         bottom_row.setSpacing(8)
-        
+
         self.date_label = QLabel()
-        self.date_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;")
+        self.date_label.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;"
+        )
         # Date tooltip will be set in _update_display
         bottom_row.addWidget(self.date_label)
-        
+
         self.date_location_sep = QLabel("•")
-        self.date_location_sep.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px; padding: 0 4px;")
+        self.date_location_sep.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px; padding: 0 4px;"
+        )
         bottom_row.addWidget(self.date_location_sep)
-        
+
         self.location_label = QLabel()
         self.location_label.setStyleSheet(f"""
             QLabel {{
@@ -154,73 +168,76 @@ class ProjectCard(QFrame):
             }}
         """)
         bottom_row.addWidget(self.location_label)
-        
+
         # Live version indicator
         self.version_label = QLabel()
-        self.version_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;")
+        self.version_label.setStyleSheet(
+            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 10px;"
+        )
         self.version_label.setVisible(False)  # Hidden by default until version is set
         bottom_row.addWidget(self.version_label)
-        
+
         self.export_indicator = QLabel()
         bottom_row.addWidget(self.export_indicator)
-        
+
         layout.addLayout(bottom_row)
-    
+
     def _set_default_logo(self) -> None:
         """Set the default logo as preview when no waveform thumbnail is available."""
         from ...utils.paths import get_resources_path
-        
+
         resources = get_resources_path()
         logo_path = resources / "images" / "als-icon.png"
-        
+
         if logo_path.exists():
             pixmap = QPixmap(str(logo_path))
             if not pixmap.isNull():
                 scaled = pixmap.scaled(
-                    156, 60,
+                    156,
+                    60,
                     Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
+                    Qt.TransformationMode.SmoothTransformation,
                 )
                 self.preview_label.setPixmap(scaled)
                 return
-        
+
         # Fallback to music note emoji if icon file is missing
         self.preview_label.setText("🎵")
-    
+
     def _apply_style(self) -> None:
         """Apply visual style to the card.
-        
+
         Projects with exports get a highlighted accent border color.
         """
-        bg_color = AbletonTheme.COLORS['surface']
-        border_color = AbletonTheme.COLORS['border']
-        
+        bg_color = AbletonTheme.COLORS["surface"]
+        border_color = AbletonTheme.COLORS["border"]
+
         # Check if project has exports for highlighting
         try:
-            has_exports = bool(self.project.exports) if hasattr(self.project, 'exports') else False
+            has_exports = bool(self.project.exports) if hasattr(self.project, "exports") else False
         except Exception:
             has_exports = False
-        
+
         # Check if project is missing
         is_missing = self.project.status == ProjectStatus.MISSING
-        
+
         if self._selected:
-            border_color = AbletonTheme.COLORS['accent']
-            bg_color = AbletonTheme.COLORS['surface_light']
+            border_color = AbletonTheme.COLORS["accent"]
+            bg_color = AbletonTheme.COLORS["surface_light"]
         elif is_missing:
             # Red border for missing projects
             border_color = "#FF0000"  # Red color for missing projects
         elif has_exports:
             # Highlight projects with exports using a green accent
             border_color = "#4CAF50"  # Green color for projects with exports
-        
+
         # Apply project color if set (overrides export highlight and missing status)
         if self.project.color:
             border_color = self.project.color
-        
+
         # Determine border width - thicker for projects with exports
         border_width = "3px" if has_exports and not self._selected else "2px"
-        
+
         # Build stylesheet - when selected, disable hover effects to show selection immediately
         if self._selected:
             # When selected, don't apply hover styles so selection is immediately visible
@@ -244,7 +261,7 @@ class ProjectCard(QFrame):
                     border-color: {AbletonTheme.COLORS['border_light']};
                 }}
             """)
-    
+
     def _update_display(self) -> None:
         """Update the display with project data."""
         # Preview thumbnail - use cached path if available, only generate if missing
@@ -254,85 +271,88 @@ class ProjectCard(QFrame):
         else:
             # Only generate if no cached thumbnail exists
             preview_path = AudioPreviewGenerator.get_or_generate_preview(self.project.id)
-        
-        if hasattr(self, 'preview_label') and self.preview_label is not None:
+
+        if hasattr(self, "preview_label") and self.preview_label is not None:
             if preview_path and Path(preview_path).exists():
                 pixmap = QPixmap(preview_path)
                 if not pixmap.isNull():
                     scaled = pixmap.scaled(
-                        156, 60,
+                        156,
+                        60,
                         Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation
+                        Qt.TransformationMode.SmoothTransformation,
                     )
                     self.preview_label.setPixmap(scaled)
                 else:
                     self._set_default_logo()
             else:
                 self._set_default_logo()
-        
+
         # Name - remove "Project" suffix for brevity
-        if hasattr(self, 'name_label') and self.name_label is not None:
+        if hasattr(self, "name_label") and self.name_label is not None:
             display_name = self._get_display_name()
             self.name_label.setText(display_name)
-        
+
         # Show parent folder name if it differs from project name (helps distinguish copies)
         self._update_folder_label()
-        
+
         # Style name label for missing projects (dark orange with yellow)
-        if hasattr(self, 'name_label') and self.name_label is not None:
+        if hasattr(self, "name_label") and self.name_label is not None:
             if self.project.status == ProjectStatus.MISSING:
-                self.name_label.setStyleSheet(f"""
-                    QLabel {{
+                self.name_label.setStyleSheet("""
+                    QLabel {
                         color: #FF8C00;  /* Dark orange */
                         background-color: #FFD700;  /* Yellow background */
                         padding: 2px 4px;
                         border-radius: 3px;
                         font-weight: bold;
-                    }}
+                    }
                 """)
             else:
                 # Reset to default styling (clear any previous styling)
                 self.name_label.setStyleSheet("")
-        
+
         # Unified tooltip for preview and name (small font, centered)
-        tooltip_html = f'<div style="font-size: 10px; text-align: center;">'
-        tooltip_html += f'<b>{self.project.name}</b><br/>'
-        
+        tooltip_html = '<div style="font-size: 10px; text-align: center;">'
+        tooltip_html += f"<b>{self.project.name}</b><br/>"
+
         if self.project.file_path:
-            tooltip_html += f'Path: {self.project.file_path}<br/>'
-        
+            tooltip_html += f"Path: {self.project.file_path}<br/>"
+
         # Track count
         if self.project.track_count and self.project.track_count > 0:
-            tooltip_html += f'Tracks: {self.project.track_count}<br/>'
-        
+            tooltip_html += f"Tracks: {self.project.track_count}<br/>"
+
         # Clip count (from custom_metadata if available, otherwise N/A)
         clip_count = None
         if self.project.custom_metadata and isinstance(self.project.custom_metadata, dict):
-            clip_count = self.project.custom_metadata.get('total_clip_count') or self.project.custom_metadata.get('clip_count')
+            clip_count = self.project.custom_metadata.get(
+                "total_clip_count"
+            ) or self.project.custom_metadata.get("clip_count")
         if clip_count:
-            tooltip_html += f'Clips: {clip_count}<br/>'
-        
+            tooltip_html += f"Clips: {clip_count}<br/>"
+
         # Sample count
         samples = self.project.get_sample_references_list()
         sample_count = len(samples) if samples else 0
         if sample_count > 0:
-            tooltip_html += f'Samples: {sample_count}<br/>'
-        
+            tooltip_html += f"Samples: {sample_count}<br/>"
+
         # Automation
         automation_status = "Yes" if self.project.has_automation else "No"
-        tooltip_html += f'Automation: {automation_status}<br/>'
-        
+        tooltip_html += f"Automation: {automation_status}<br/>"
+
         # Version
         version_display = self.project.get_live_version_display()
         if version_display:
             full_version = self.project.ableton_version or version_display
-            tooltip_html += f'Version: {full_version}<br/>'
-        
+            tooltip_html += f"Version: {full_version}<br/>"
+
         # Key/Scale
         key_display = self.project.get_key_display()
         if key_display:
-            tooltip_html += f'Key: {key_display}<br/>'
-        
+            tooltip_html += f"Key: {key_display}<br/>"
+
         # File size
         if self.project.file_size and self.project.file_size > 0:
             size_mb = self.project.file_size / (1024 * 1024)
@@ -340,41 +360,45 @@ class ProjectCard(QFrame):
                 size_str = f"{size_mb * 1024:.0f} KB"
             else:
                 size_str = f"{size_mb:.1f} MB"
-            tooltip_html += f'Size: {size_str}<br/>'
-        
+            tooltip_html += f"Size: {size_str}<br/>"
+
         # Exports (with click hint)
         export_count = len(self._exports)
         if export_count > 0:
-            tooltip_html += f'<b style="color: #4CAF50;">Exports: {export_count} 🔊 (click to play)</b><br/>'
-        
+            tooltip_html += (
+                f'<b style="color: #4CAF50;">Exports: {export_count} 🔊 (click to play)</b><br/>'
+            )
+
         # Dates
         if self.project.created_date:
             tooltip_html += f'Created: {self.project.created_date.strftime("%Y-%m-%d %H:%M")}<br/>'
         if self.project.modified_date:
-            tooltip_html += f'Modified: {self.project.modified_date.strftime("%Y-%m-%d %H:%M")}<br/>'
+            tooltip_html += (
+                f'Modified: {self.project.modified_date.strftime("%Y-%m-%d %H:%M")}<br/>'
+            )
         if self.project.last_scanned:
             tooltip_html += f'Scanned: {self.project.last_scanned.strftime("%Y-%m-%d %H:%M")}<br/>'
         if self.project.last_parsed:
             tooltip_html += f'Parsed: {self.project.last_parsed.strftime("%Y-%m-%d %H:%M")}<br/>'
-        
-        tooltip_html += '</div>'
-        
+
+        tooltip_html += "</div>"
+
         # Set tooltip on both preview and name
-        if hasattr(self, 'preview_label') and self.preview_label is not None:
+        if hasattr(self, "preview_label") and self.preview_label is not None:
             self.preview_label.setToolTip(tooltip_html)
-        if hasattr(self, 'name_label') and self.name_label is not None:
+        if hasattr(self, "name_label") and self.name_label is not None:
             self.name_label.setToolTip(tooltip_html)
-        
+
         # Tempo with rainbow color based on BPM (purple=60 -> blue -> cyan -> green -> yellow -> orange -> red=200+)
         has_tempo = bool(self.project.tempo and self.project.tempo > 0)
         has_length = bool(self.project.arrangement_length and self.project.arrangement_length > 0)
-        
-        if hasattr(self, 'tempo_label') and self.tempo_label is not None:
+
+        if hasattr(self, "tempo_label") and self.tempo_label is not None:
             if has_tempo:
                 tempo = self.project.tempo
                 self.tempo_label.setText(f"{tempo:.0f}")
                 # Remove individual tooltip - unified tooltip on name/preview
-                
+
                 # Calculate color based on tempo (60-200 BPM range mapped to rainbow)
                 tempo_color = self._get_tempo_color(tempo)
                 self.tempo_label.setStyleSheet(f"""
@@ -386,15 +410,15 @@ class ProjectCard(QFrame):
                     }}
                 """)
                 self.tempo_label.setVisible(True)
-                if hasattr(self, 'bpm_label') and self.bpm_label is not None:
+                if hasattr(self, "bpm_label") and self.bpm_label is not None:
                     self.bpm_label.setVisible(True)
             else:
                 self.tempo_label.setVisible(False)
-                if hasattr(self, 'bpm_label') and self.bpm_label is not None:
+                if hasattr(self, "bpm_label") and self.bpm_label is not None:
                     self.bpm_label.setVisible(False)
-        
+
         # Arrangement length in bars
-        if hasattr(self, 'length_label') and self.length_label is not None:
+        if hasattr(self, "length_label") and self.length_label is not None:
             if has_length:
                 bars = int(self.project.arrangement_length)
                 self.length_label.setText(f"{bars} bars")
@@ -402,12 +426,14 @@ class ProjectCard(QFrame):
                 self.length_label.setVisible(True)
             else:
                 self.length_label.setVisible(False)
-        
+
         # Duration in min:sec (calculated from bars and tempo)
-        has_duration = (hasattr(self.project, 'arrangement_duration_seconds') and 
-                       self.project.arrangement_duration_seconds and 
-                       self.project.arrangement_duration_seconds > 0)
-        if hasattr(self, 'duration_label') and self.duration_label is not None:
+        has_duration = (
+            hasattr(self.project, "arrangement_duration_seconds")
+            and self.project.arrangement_duration_seconds
+            and self.project.arrangement_duration_seconds > 0
+        )
+        if hasattr(self, "duration_label") and self.duration_label is not None:
             if has_duration:
                 duration_sec = int(self.project.arrangement_duration_seconds)
                 minutes = duration_sec // 60
@@ -418,22 +444,26 @@ class ProjectCard(QFrame):
                 self.duration_label.setVisible(True)
             else:
                 self.duration_label.setVisible(False)
-        
+
         # Show separator only if both tempo and length are visible
-        if hasattr(self, 'tempo_sep') and self.tempo_sep is not None:
+        if hasattr(self, "tempo_sep") and self.tempo_sep is not None:
             self.tempo_sep.setVisible(bool(has_tempo and has_length))
-        
+
         # Show separator based on visibility
         has_date = bool(self.project.modified_date)
-        has_location = self.location_label.isVisible() if hasattr(self, 'location_label') and self.location_label is not None else False
-        if hasattr(self, 'date_location_sep') and self.date_location_sep is not None:
+        has_location = (
+            self.location_label.isVisible()
+            if hasattr(self, "location_label") and self.location_label is not None
+            else False
+        )
+        if hasattr(self, "date_location_sep") and self.date_location_sep is not None:
             self.date_location_sep.setVisible(bool(has_date and has_location))
-        
+
         # Location
         # Access location safely (may be detached)
-        if hasattr(self, 'location_label') and self.location_label is not None:
+        if hasattr(self, "location_label") and self.location_label is not None:
             try:
-                location = self.project.location if hasattr(self.project, 'location') else None
+                location = self.project.location if hasattr(self.project, "location") else None
                 if location:
                     loc_name = location.name
                     if len(loc_name) > 12:
@@ -446,70 +476,72 @@ class ProjectCard(QFrame):
             except Exception:
                 # If relationship is detached, hide location
                 self.location_label.setVisible(False)
-        
+
         # Live version
-        if hasattr(self, 'version_label') and self.version_label is not None:
+        if hasattr(self, "version_label") and self.version_label is not None:
             version_display = self.project.get_live_version_display()
             if version_display:
                 self.version_label.setText(version_display)
                 self.version_label.setVisible(True)
             else:
                 self.version_label.setVisible(False)
-        
+
         # Export indicator
-        if hasattr(self, 'export_indicator') and self.export_indicator is not None:
+        if hasattr(self, "export_indicator") and self.export_indicator is not None:
             # Access exports list safely (may be detached)
             try:
-                has_exports = bool(self.project.exports) if hasattr(self.project, 'exports') else False
+                has_exports = (
+                    bool(self.project.exports) if hasattr(self.project, "exports") else False
+                )
                 export_count = len(self.project.exports) if has_exports else 0
             except Exception:
                 # If relationship is detached, check if we have export count
                 has_exports = False
                 export_count = 0
-            
+
             if has_exports:
                 # Show colorized indicator with count
                 self.export_indicator.setText(f"🎵 {export_count}" if export_count > 1 else "🎵")
-                self.export_indicator.setStyleSheet(f"""
-                    QLabel {{
+                self.export_indicator.setStyleSheet("""
+                    QLabel {
                         color: #4CAF50;
                         font-weight: bold;
-                    }}
+                    }
                 """)
                 # Remove individual tooltip - unified tooltip on name/preview
             else:
                 self.export_indicator.setText("")
                 self.export_indicator.setStyleSheet("")
                 # Remove individual tooltip - unified tooltip on name/preview
-        
+
         # Favorite indicator
-        if hasattr(self, 'favorite_indicator') and self.favorite_indicator is not None:
+        if hasattr(self, "favorite_indicator") and self.favorite_indicator is not None:
             self.favorite_indicator.setText("💎" if self.project.is_favorite else "")
-        
+
         # Modified date
-        if hasattr(self, 'date_label') and self.date_label is not None:
+        if hasattr(self, "date_label") and self.date_label is not None:
             if self.project.modified_date:
                 date_str = self._format_date(self.project.modified_date)
                 self.date_label.setText(date_str)
                 # Remove individual tooltip - unified tooltip on name/preview
             else:
                 self.date_label.setText("")
-    
+
     def _get_tempo_color(self, tempo: float) -> str:
         """Get a rainbow color based on tempo (purple=60 -> red=200+).
-        
+
         Args:
             tempo: The tempo in BPM.
-            
+
         Returns:
             Hex color string.
         """
         # Clamp tempo to range 60-200
         tempo = max(60, min(200, tempo))
-        
+
         # Normalize to 0-1 range
         t = (tempo - 60) / 140.0
-        
+
         # Rainbow colors: purple -> blue -> cyan -> green -> yellow -> orange -> red
         # Brightened purple and blue for better readability
         if t < 0.167:  # Purple to Blue
@@ -538,14 +570,14 @@ class ProjectCard(QFrame):
             r = 255
             g = int(155 - 155 * ((t - 0.833) / 0.167))
             b = 0
-        
+
         return f"#{r:02x}{g:02x}{b:02x}"
-    
+
     def _format_date(self, dt: datetime) -> str:
         """Format a date for display."""
         now = datetime.now()
         delta = now - dt
-        
+
         if delta.days == 0:
             hours = delta.seconds // 3600
             if hours == 0:
@@ -564,131 +596,136 @@ class ProjectCard(QFrame):
             return f"{months}mo ago"
         else:
             return dt.strftime("%Y-%m-%d")
-    
+
     def set_selected(self, selected: bool) -> None:
         """Set the selection state."""
         self._selected = selected
         self._apply_style()
         # Force immediate update to ensure visual feedback
         self.update()
-    
+
     def is_selected(self) -> bool:
         """Check if the card is selected."""
         return self._selected
-    
+
     def _load_exports(self) -> None:
         """Load exports for this project from the database."""
         from ...database import get_session
-        
+
         session = get_session()
         try:
             # Get exports sorted by date (most recent first)
-            exports = session.query(Export).filter(
-                Export.project_id == self.project.id
-            ).order_by(Export.export_date.desc()).all()
-            
+            exports = (
+                session.query(Export)
+                .filter(Export.project_id == self.project.id)
+                .order_by(Export.export_date.desc())
+                .all()
+            )
+
             # Filter to only existing files and normalize paths
             self._exports = []
             for e in exports:
                 export_path = Path(e.export_path)
                 if export_path.exists():
                     self._exports.append(e)
-            
+
             # Reset index if it's out of bounds
             if self._current_export_index >= len(self._exports):
                 self._current_export_index = 0
         finally:
             session.close()
-    
+
     def refresh_exports(self) -> None:
         """Refresh the exports list from the database (useful after exports are added)."""
         self._load_exports()
         # Update display to reflect new export count
         self._update_display()
-    
+
     def has_exports(self) -> bool:
         """Check if this project has playable exports."""
         return len(self._exports) > 0
-    
+
     def get_export_count(self) -> int:
         """Get the number of playable exports."""
         return len(self._exports)
-    
+
     def _play_current_export(self) -> None:
         """Play the current export in the cycle."""
         if not self._exports:
             return
-        
+
         export = self._exports[self._current_export_index]
         export_path = export.export_path
-        
+
         if Path(export_path).exists():
             # Stop any current playback first
             self._audio_player.stop()
             # Play the export
             self._audio_player.play(export_path)
             self.export_playing.emit(self.project.id, export_path)
-            
+
             # Update visual indicator
             self._update_playing_indicator(True)
-    
+
     def _cycle_to_next_export(self) -> None:
         """Move to the next export in the list."""
         if self._exports:
             self._current_export_index = (self._current_export_index + 1) % len(self._exports)
-    
+
     def _on_playback_finished(self) -> None:
         """Handle when playback finishes naturally."""
         self._update_playing_indicator(False)
-    
+
     def _on_playback_stopped(self) -> None:
         """Handle when playback is stopped."""
         self._update_playing_indicator(False)
-    
+
     def cleanup(self) -> None:
         """Clean up resources before deletion."""
         # Disconnect signals to prevent callbacks after deletion
-        if hasattr(self, '_audio_player') and self._audio_player:
+        if hasattr(self, "_audio_player") and self._audio_player:
             try:
                 self._audio_player.playback_finished.disconnect(self._on_playback_finished)
                 self._audio_player.playback_stopped.disconnect(self._on_playback_stopped)
             except (TypeError, RuntimeError):
                 # Signals may already be disconnected or object deleted
                 pass
-    
+
     def _get_display_name(self) -> str:
         """Get the display name for the project, removing 'Project' for brevity."""
         import re
+
         name = self.project.name
         # Remove all instances of "project" (case-insensitive) - they're all projects anyway
         # Also clean up any resulting double spaces, leading/trailing separators
-        name = re.sub(r'[Pp]roject', '', name)
-        name = re.sub(r'[\s_-]+', ' ', name)  # Normalize multiple spaces/separators to single space
-        return name.strip(' -_')
-    
+        name = re.sub(r"[Pp]roject", "", name)
+        name = re.sub(r"[\s_-]+", " ", name)  # Normalize multiple spaces/separators to single space
+        return name.strip(" -_")
+
     def _update_folder_label(self) -> None:
         """Update folder label to show parent folder when it differs from project name.
-        
+
         This helps distinguish copies and projects with the same .als filename
         but in different folders (e.g., 'Project - Copy/Project.als').
         """
-        if not hasattr(self, 'folder_label') or self.folder_label is None:
+        if not hasattr(self, "folder_label") or self.folder_label is None:
             return
-        
+
         if not self.project.file_path:
             self.folder_label.setVisible(False)
             return
-        
+
         from pathlib import Path
+
         project_path = Path(self.project.file_path)
         parent_folder = project_path.parent.name
         project_name = self.project.name
-        
+
         # Check if parent folder name is meaningfully different from project name
         # Normalize both for comparison (remove common suffixes like "Project")
         parent_lower = parent_folder.lower().replace(" project", "").replace("_project", "").strip()
         name_lower = project_name.lower().replace(" project", "").replace("_project", "").strip()
-        
+
         # Show folder label if they're different (indicates copy or alternate naming)
         if parent_lower != name_lower and parent_folder:
             # Truncate long folder names
@@ -699,12 +736,12 @@ class ProjectCard(QFrame):
             self.folder_label.setVisible(True)
         else:
             self.folder_label.setVisible(False)
-    
+
     def _update_playing_indicator(self, playing: bool) -> None:
         """Update visual indicator for playback state."""
-        if not hasattr(self, 'name_label') or self.name_label is None:
+        if not hasattr(self, "name_label") or self.name_label is None:
             return
-        
+
         if playing and self._exports:
             export = self._exports[self._current_export_index]
             export_name = Path(export.export_path).stem
@@ -714,15 +751,19 @@ class ProjectCard(QFrame):
             idx = self._current_export_index + 1
             total = len(self._exports)
             self.name_label.setText(f"🔊 {export_name} ({idx}/{total})")
-            self.name_label.setStyleSheet(f"color: {AbletonTheme.COLORS['accent']}; font-weight: bold;")
+            self.name_label.setStyleSheet(
+                f"color: {AbletonTheme.COLORS['accent']}; font-weight: bold;"
+            )
         else:
             # Restore original name (with "Project" removed)
             name = self._get_display_name()
             if len(name) > 25:
                 name = name[:22] + "..."
             self.name_label.setText(name)
-            self.name_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_primary']}; font-weight: bold;")
-    
+            self.name_label.setStyleSheet(
+                f"color: {AbletonTheme.COLORS['text_primary']}; font-weight: bold;"
+            )
+
     def _is_this_card_playing(self) -> bool:
         """Check if this card's export is currently playing."""
         if not self._audio_player.is_playing or not self._exports:
@@ -738,7 +779,7 @@ class ProjectCard(QFrame):
                 if export_path == current_path:
                     return True
         return False
-    
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse press - single click plays exports if available."""
         if event.button() == Qt.MouseButton.LeftButton:
@@ -756,17 +797,17 @@ class ProjectCard(QFrame):
                 else:
                     # First click or returning to this card - play current export
                     self._play_current_export()
-            
+
             # Always emit clicked signal for selection
             self.clicked.emit(self.project.id)
         super().mousePressEvent(event)
-    
+
     def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
         """Handle double click - opens project details."""
         if event.button() == Qt.MouseButton.LeftButton:
             self.double_clicked.emit(self.project.id)
         super().mouseDoubleClickEvent(event)
-    
+
     def contextMenuEvent(self, event: QContextMenuEvent) -> None:
         """Handle context menu request."""
         self.context_menu.emit(self.project.id, event.globalPos())

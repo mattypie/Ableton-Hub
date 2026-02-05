@@ -12,25 +12,19 @@ ML/AI services are lazy-loaded to avoid slow startup from heavy library imports
 """
 
 # Core services - loaded eagerly (lightweight, needed at startup)
-from .scanner import ProjectScanner
-from .watcher import FileWatcher
-from .export_tracker import ExportTracker
-from .link_scanner import LinkScanner
-from .remote_sync import RemoteSync
-from .smart_collections import SmartCollectionService
-from .duplicate_detector import DuplicateDetector
-from .health_calculator import HealthCalculator
+from .als_parser import ALSParser, ClipInfo, DeviceChainInfo, ExtendedMetadata, ProjectMetadata
 from .audio_preview import AudioPreviewGenerator
-from .marker_extractor import MarkerExtractor
-from .als_parser import (
-    ALSParser, 
-    ProjectMetadata, 
-    ExtendedMetadata,
-    DeviceChainInfo,
-    ClipInfo
-)
+from .duplicate_detector import DuplicateDetector
+from .export_tracker import ExportTracker
+from .health_calculator import HealthCalculator
+from .link_scanner import LinkScanner
 from .live_detector import LiveDetector, LiveVersion
 from .live_launcher import LiveLauncher
+from .marker_extractor import MarkerExtractor
+from .remote_sync import RemoteSync
+from .scanner import ProjectScanner
+from .smart_collections import SmartCollectionService
+from .watcher import FileWatcher
 
 # ML/AI Services - lazy-loaded to avoid slow startup
 # These import heavy libraries (numpy, sklearn, librosa) so we defer them
@@ -66,21 +60,20 @@ _loaded_modules = {}
 
 def __getattr__(name: str):
     """Lazy-load ML/AI services on first access.
-    
+
     This avoids importing heavy libraries (numpy, sklearn, librosa) at startup.
     """
     if name in _ML_SERVICES:
         module_name, attr_name = _ML_SERVICES[name]
-        
+
         # Check if module is already loaded
         if module_name not in _loaded_modules:
             import importlib
-            _loaded_modules[module_name] = importlib.import_module(
-                f".{module_name}", __package__
-            )
-        
+
+            _loaded_modules[module_name] = importlib.import_module(f".{module_name}", __package__)
+
         return getattr(_loaded_modules[module_name], attr_name)
-    
+
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
