@@ -2013,7 +2013,8 @@ class MainWindow(QMainWindow):
             session.commit()
 
             # Auto-set default if only one installation exists
-            from ..controllers.live_controller import LiveController
+            # Import LiveController using absolute import (src is in sys.path from main.py)
+            from src.ui.controllers.live_controller import LiveController
 
             live_controller = LiveController()
             # Check if we need to set default (after commit, so use new session)

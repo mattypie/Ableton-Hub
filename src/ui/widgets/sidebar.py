@@ -357,6 +357,34 @@ class Sidebar(QWidget):
         sep3.setFixedHeight(1)
         content_layout.addWidget(sep3)
 
+        # Ableton Live Installs section (moved above Learning)
+        self.live_versions_section = SidebarSection("INSTALLS")
+        self.live_versions_container = QWidget()
+        self.live_versions_layout = QVBoxLayout(self.live_versions_container)
+        self.live_versions_layout.setContentsMargins(0, 0, 0, 0)
+        self.live_versions_layout.setSpacing(2)
+        self.live_versions_section.add_item(self.live_versions_container)
+        
+        # Add button to manually add installation
+        add_install_btn = SidebarItem("Add Installation", "+")
+        add_install_btn.setCheckable(False)
+        add_install_btn.setToolTip("Add a Live installation manually")
+        add_install_btn.clicked.connect(
+            lambda: self.add_manual_installation_requested.emit()
+        )
+        self.live_versions_section.add_item(add_install_btn)
+        
+        self._live_version_items = []
+        self._load_live_versions()
+        content_layout.addWidget(self.live_versions_section)
+
+        # Separator
+        sep_live = QFrame()
+        sep_live.setFrameShape(QFrame.Shape.HLine)
+        sep_live.setStyleSheet(f"background-color: {AbletonTheme.COLORS['border']};")
+        sep_live.setFixedHeight(1)
+        content_layout.addWidget(sep_live)
+
         # Learning section
         learning_section = SidebarSection("LEARNING")
 
@@ -593,24 +621,6 @@ class Sidebar(QWidget):
         sep_backups.setStyleSheet(f"background-color: {AbletonTheme.COLORS['border']};")
         sep_backups.setFixedHeight(1)
         content_layout.addWidget(sep_backups)
-
-        # Ableton Live Installs section
-        self.live_versions_section = SidebarSection("INSTALLS")
-        self.live_versions_container = QWidget()
-        self.live_versions_layout = QVBoxLayout(self.live_versions_container)
-        self.live_versions_layout.setContentsMargins(0, 0, 0, 0)
-        self.live_versions_layout.setSpacing(2)
-        self.live_versions_section.add_item(self.live_versions_container)
-        self._live_version_items = []
-        self._load_live_versions()
-        content_layout.addWidget(self.live_versions_section)
-
-        # Separator
-        sep_live = QFrame()
-        sep_live.setFrameShape(QFrame.Shape.HLine)
-        sep_live.setStyleSheet(f"background-color: {AbletonTheme.COLORS['border']};")
-        sep_live.setFixedHeight(1)
-        content_layout.addWidget(sep_live)
 
         # MCP Servers section (Ableton MCP integrations)
         mcp_section = SidebarSection("MCP AGENTS", start_collapsed=True)

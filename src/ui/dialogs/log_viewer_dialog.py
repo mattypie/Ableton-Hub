@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from PyQt6.QtCore import QDesktopServices, QUrl
-from PyQt6.QtGui import QTextCursor
+from PyQt6.QtCore import QUrl
+from PyQt6.QtGui import QDesktopServices, QTextCursor
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
