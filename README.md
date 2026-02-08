@@ -608,10 +608,14 @@ MIT License - see LICENSE file for details.
 
 ## 👤 Author
 
+<a href="https://www.ableton.com/en/certified-training/tom-carlile/">
+  <img src="https://cdn-resources.ableton.com/resources/filer_thumbnails/52/d0/52d08c3a-8e12-47d2-8848-2e65675c5f31/tom_carlile.jpg__600x600_q85_crop_subsampling-2_upscale.jpg" width="120" alt="Tom Carlile" style="border-radius: 50%;" />
+</a>
+
 **Tom Carlile**  
 Email: carlile.tom@gmail.com
 
-Ableton Certified Trainer and Austin Ableton User Group Organizer 
+Ableton Certified Trainer and Austin Ableton User Group Organizer  
 https://www.ableton.com/en/certified-training/tom-carlile/
 
 ## ⚠️ Disclaimer
