@@ -181,11 +181,44 @@ class ProjectPropertiesView(QWidget):
         self.version_label = QLabel()
         project_layout.addWidget(self.version_label, row, 1)
 
+        row += 1
         lbl = QLabel("Tempo:")
         lbl.setStyleSheet(label_style)
-        project_layout.addWidget(lbl, row, 2)
+        project_layout.addWidget(lbl, row, 0)
         self.tempo_label = QLabel()
-        project_layout.addWidget(self.tempo_label, row, 3)
+        project_layout.addWidget(self.tempo_label, row, 1)
+
+        lbl = QLabel("Time Signature:")
+        lbl.setStyleSheet(label_style)
+        project_layout.addWidget(lbl, row, 2)
+        self.time_sig_label = QLabel()
+        project_layout.addWidget(self.time_sig_label, row, 3)
+
+        row += 1
+        lbl = QLabel("Key:")
+        lbl.setStyleSheet(label_style)
+        project_layout.addWidget(lbl, row, 0)
+        self.key_label = QLabel()
+        project_layout.addWidget(self.key_label, row, 1)
+
+        lbl = QLabel("Arrangement Length:")
+        lbl.setStyleSheet(label_style)
+        project_layout.addWidget(lbl, row, 2)
+        self.length_label = QLabel()
+        project_layout.addWidget(self.length_label, row, 3)
+
+        row += 1
+        lbl = QLabel("Session Clip Length:")
+        lbl.setStyleSheet(label_style)
+        project_layout.addWidget(lbl, row, 0)
+        self.sample_length_label = QLabel()
+        project_layout.addWidget(self.sample_length_label, row, 1)
+
+        lbl = QLabel("Markers:")
+        lbl.setStyleSheet(label_style)
+        project_layout.addWidget(lbl, row, 2)
+        self.markers_label = QLabel()
+        project_layout.addWidget(self.markers_label, row, 3)
 
         row += 1
         lbl = QLabel("Tracks:")
@@ -214,17 +247,12 @@ class ProjectPropertiesView(QWidget):
         project_layout.addWidget(self.automation_label, row, 3)
 
         row += 1
-        lbl = QLabel("Key:")
+        lbl = QLabel("Annotation:")
         lbl.setStyleSheet(label_style)
         project_layout.addWidget(lbl, row, 0)
-        self.key_label = QLabel()
-        project_layout.addWidget(self.key_label, row, 1)
-
-        lbl = QLabel("Length:")
-        lbl.setStyleSheet(label_style)
-        project_layout.addWidget(lbl, row, 2)
-        self.length_label = QLabel()
-        project_layout.addWidget(self.length_label, row, 3)
+        self.annotation_label = QLabel()
+        self.annotation_label.setWordWrap(True)
+        project_layout.addWidget(self.annotation_label, row, 1, 1, 3)
 
         row += 1
         lbl = QLabel("Created:")
@@ -614,9 +642,99 @@ class ProjectPropertiesView(QWidget):
             )
             self.version_label.setText(version_display or "Unknown")
 
-            # Track count
+            # Tempo
+            if self._project.tempo and self._project.tempo > 0:
+                self.tempo_label.setText(f"{self._project.tempo:.1f} BPM")
+            else:
+                self.tempo_label.setText("Unknown")
+
+            # Time Signature
+            time_sig = getattr(self._project, "time_signature", None)
+            self.time_sig_label.setText(time_sig if time_sig else "Unknown")
+
+            # Key/Scale
+            key_display = (
+                self._project.get_key_display()
+                if hasattr(self._project, "get_key_display")
+                else None
+            )
+            self.key_label.setText(key_display or "Unknown")
+
+            # Arrangement Length (bars + duration)
+            if self._project.arrangement_length and self._project.arrangement_length > 0:
+                bars = int(self._project.arrangement_length)
+                length_str = f"{bars} bars"
+                # Add duration if available
+                if (
+                    hasattr(self._project, "arrangement_duration_seconds")
+                    and self._project.arrangement_duration_seconds
+                    and self._project.arrangement_duration_seconds > 0
+                ):
+                    dur_sec = int(self._project.arrangement_duration_seconds)
+                    minutes = dur_sec // 60
+                    seconds = dur_sec % 60
+                    length_str += f" ({minutes}:{seconds:02d})"
+                self.length_label.setText(length_str)
+            else:
+                self.length_label.setText("None")
+
+            # Sample Length (longest session clip)
+            if (
+                hasattr(self._project, "furthest_sample_end")
+                and self._project.furthest_sample_end
+                and self._project.furthest_sample_end > 0
+            ):
+                sample_bars = int(self._project.furthest_sample_end)
+                sample_str = f"{sample_bars} bars"
+                if (
+                    hasattr(self._project, "sample_duration_seconds")
+                    and self._project.sample_duration_seconds
+                    and self._project.sample_duration_seconds > 0
+                ):
+                    dur_sec = int(self._project.sample_duration_seconds)
+                    minutes = dur_sec // 60
+                    seconds = dur_sec % 60
+                    sample_str += f" ({minutes}:{seconds:02d})"
+                self.sample_length_label.setText(sample_str)
+            else:
+                self.sample_length_label.setText("None")
+
+            # Timeline Markers
+            markers = (
+                self._project.get_timeline_markers_list()
+                if hasattr(self._project, "get_timeline_markers_list")
+                else []
+            )
+            marker_count = len(markers) if markers else 0
+            if marker_count > 0:
+                marker_names = [m.get("text", "") for m in markers if m.get("text")]
+                if marker_names:
+                    self.markers_label.setText(
+                        f"{marker_count} ({', '.join(marker_names[:5])})"
+                    )
+                    if len(marker_names) > 5:
+                        self.markers_label.setToolTip(", ".join(marker_names))
+                else:
+                    self.markers_label.setText(str(marker_count))
+            else:
+                self.markers_label.setText("None")
+
+            # Track count (with type breakdown)
             if self._project.track_count and self._project.track_count > 0:
-                self.track_count_label.setText(str(self._project.track_count))
+                track_str = str(self._project.track_count)
+                parts = []
+                audio = getattr(self._project, "audio_tracks", 0) or 0
+                midi = getattr(self._project, "midi_tracks", 0) or 0
+                ret = getattr(self._project, "return_tracks", 0) or 0
+                if audio:
+                    parts.append(f"{audio}A")
+                if midi:
+                    parts.append(f"{midi}M")
+                if ret:
+                    parts.append(f"{ret}R")
+                if parts:
+                    track_str += f" ({', '.join(parts)})"
+                self.track_count_label.setText(track_str)
             else:
                 self.track_count_label.setText("Unknown")
 
@@ -643,27 +761,18 @@ class ProjectPropertiesView(QWidget):
                 "Yes" if has_automation else "No" if has_automation is not None else "Unknown"
             )
 
-            # Tempo
-            if self._project.tempo and self._project.tempo > 0:
-                self.tempo_label.setText(f"{self._project.tempo:.1f} BPM")
+            # Annotation (project notes from ALS file)
+            annotation = getattr(self._project, "annotation", None)
+            if annotation and annotation.strip():
+                # Truncate long annotations for display
+                display_text = annotation.strip()
+                if len(display_text) > 200:
+                    self.annotation_label.setText(display_text[:200] + "...")
+                    self.annotation_label.setToolTip(display_text)
+                else:
+                    self.annotation_label.setText(display_text)
             else:
-                self.tempo_label.setText("Unknown")
-
-            # Key/Scale
-            key_display = (
-                self._project.get_key_display()
-                if hasattr(self._project, "get_key_display")
-                else None
-            )
-            self.key_label.setText(key_display or "Unknown")
-
-            # Arrangement Length
-            if self._project.arrangement_length and self._project.arrangement_length > 0:
-                minutes = int(self._project.arrangement_length // 60)
-                seconds = int(self._project.arrangement_length % 60)
-                self.length_label.setText(f"{minutes}:{seconds:02d}")
-            else:
-                self.length_label.setText("Unknown")
+                self.annotation_label.setText("None")
 
             # Dates
             if self._project.created_date:

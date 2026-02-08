@@ -428,6 +428,14 @@ class FileWatcher(QObject):
             ) * 60.0
         else:
             project.arrangement_duration_seconds = None
+        # Store longest session clip (sample) length separately
+        project.furthest_sample_end = metadata.furthest_sample_end
+        if metadata.furthest_sample_end and metadata.tempo and metadata.tempo > 0:
+            project.sample_duration_seconds = (
+                metadata.furthest_sample_end * 4.0 / metadata.tempo
+            ) * 60.0
+        else:
+            project.sample_duration_seconds = None
         project.ableton_version = metadata.ableton_version
         project.sample_references = (
             json.dumps(metadata.sample_references) if metadata.sample_references else "[]"

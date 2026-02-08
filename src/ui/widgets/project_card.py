@@ -338,6 +338,25 @@ class ProjectCard(QFrame):
         if sample_count > 0:
             tooltip_html += f"Samples: {sample_count}<br/>"
 
+        # Session clip length (longest recorded sample)
+        if (
+            hasattr(self.project, "furthest_sample_end")
+            and self.project.furthest_sample_end
+            and self.project.furthest_sample_end > 0
+        ):
+            sample_bars = int(self.project.furthest_sample_end)
+            sample_len_str = f"{sample_bars} bars"
+            if (
+                hasattr(self.project, "sample_duration_seconds")
+                and self.project.sample_duration_seconds
+                and self.project.sample_duration_seconds > 0
+            ):
+                dur_sec = int(self.project.sample_duration_seconds)
+                minutes = dur_sec // 60
+                seconds = dur_sec % 60
+                sample_len_str += f" ({minutes}:{seconds:02d})"
+            tooltip_html += f"Session Clips: {sample_len_str}<br/>"
+
         # Automation
         automation_status = "Yes" if self.project.has_automation else "No"
         tooltip_html += f"Automation: {automation_status}<br/>"

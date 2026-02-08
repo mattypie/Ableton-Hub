@@ -103,7 +103,8 @@ class ProjectMetadata:
     midi_tracks: int = 0
     return_tracks: int = 0
     master_track: bool = False
-    arrangement_length: float | None = None  # In bars
+    arrangement_length: float | None = None  # In bars (arrangement view clips only)
+    furthest_sample_end: float | None = None  # Longest session clip in bars
     ableton_version: str | None = None
     sample_references: list[str] = field(default_factory=list)  # Sample file paths
     has_automation: bool = False
@@ -211,8 +212,11 @@ class ALSParser:
             metadata.return_tracks = tracks_info["return"]
             metadata.master_track = tracks_info["master"]
 
-            # Extract arrangement length
+            # Extract arrangement length (arrangement view only)
             metadata.arrangement_length = self._extract_arrangement_length(root)
+
+            # Extract longest session clip length (recorded samples etc.)
+            metadata.furthest_sample_end = self._extract_furthest_sample_end(root)
 
             # Extract plugins and devices
             plugins, devices = self._extract_plugins_and_devices(root)
@@ -353,22 +357,31 @@ class ALSParser:
         return counts
 
     def _extract_arrangement_length(self, root: ET.Element) -> float | None:
-        """Extract arrangement length in bars by finding the furthest clip end."""
+        """Extract arrangement length in bars by finding the furthest clip end.
+
+        Only considers clips placed on the arrangement timeline (inside
+        ArrangementClips containers), NOT clips sitting in session view
+        clip slots. This prevents recorded samples in session view from
+        inflating the reported arrangement length.
+        """
         max_end = 0.0
 
-        # Look for MidiClip and AudioClip elements
-        for clip_elem in root.iter():
-            if clip_elem.tag in ("MidiClip", "AudioClip"):
-                # Find CurrentEnd within the clip
-                for sub in clip_elem:
-                    if sub.tag == "CurrentEnd":
-                        try:
-                            end_val = float(sub.get("Value", 0))
-                            if end_val > max_end:
-                                max_end = end_val
-                        except (ValueError, TypeError):
-                            pass
-                        break
+        # Only look for clips inside ArrangementClips containers
+        # In Ableton's XML, arrangement clips live under:
+        #   Track > DeviceChain > MainSequencer > Sample/ClipTimeable > ArrangementClips
+        for arr_clips_elem in root.iter():
+            if arr_clips_elem.tag == "ArrangementClips":
+                for clip_elem in arr_clips_elem.iter():
+                    if clip_elem.tag in ("MidiClip", "AudioClip"):
+                        for sub in clip_elem:
+                            if sub.tag == "CurrentEnd":
+                                try:
+                                    end_val = float(sub.get("Value", 0))
+                                    if end_val > max_end:
+                                        max_end = end_val
+                                except (ValueError, TypeError):
+                                    pass
+                                break
 
         # Also check for arrangement markers (Locators)
         for locator in root.iter("Locator"):
@@ -382,6 +395,38 @@ class ALSParser:
 
         # Return length in bars (beats / 4 for 4/4 time)
         # Ableton stores time in beats, not bars
+        if max_end > 0:
+            return max_end / 4.0
+
+        return None
+
+    def _extract_furthest_sample_end(self, root: ET.Element) -> float | None:
+        """Extract the longest session clip length in bars.
+
+        Looks at clips inside ClipSlotList containers (session view) to find
+        the longest recorded sample or clip. This is tracked separately from
+        arrangement length so samples don't inflate the arrangement duration.
+        """
+        max_end = 0.0
+
+        # Look for clips inside ClipSlotList containers (session view)
+        # In Ableton's XML, session clips live under:
+        #   Track > DeviceChain > MainSequencer > ClipSlotList > ClipSlot > Value > Clip
+        for clip_slot_list in root.iter():
+            if clip_slot_list.tag == "ClipSlotList":
+                for clip_elem in clip_slot_list.iter():
+                    if clip_elem.tag in ("MidiClip", "AudioClip"):
+                        for sub in clip_elem:
+                            if sub.tag == "CurrentEnd":
+                                try:
+                                    end_val = float(sub.get("Value", 0))
+                                    if end_val > max_end:
+                                        max_end = end_val
+                                except (ValueError, TypeError):
+                                    pass
+                                break
+
+        # Return length in bars (beats / 4 for 4/4 time)
         if max_end > 0:
             return max_end / 4.0
 

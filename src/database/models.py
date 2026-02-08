@@ -228,10 +228,14 @@ class Project(Base):
     midi_tracks = Column(Integer, default=0)  # MIDI track count
     return_tracks = Column(Integer, default=0)  # Return track count
     has_master_track = Column(Boolean, default=True)  # Has master track
-    arrangement_length = Column(Float, nullable=True)  # Length in bars
+    arrangement_length = Column(Float, nullable=True)  # Length in bars (arrangement view only)
     arrangement_duration_seconds = Column(
         Float, nullable=True
     )  # Calculated duration in seconds (bars * 4 / tempo * 60)
+    furthest_sample_end = Column(Float, nullable=True)  # Longest session clip in bars
+    sample_duration_seconds = Column(
+        Float, nullable=True
+    )  # Calculated sample duration in seconds
     ableton_version = Column(String(50), nullable=True)  # Version that created the set
     sample_references = Column(JSON, default=list)  # List of sample file paths
     has_automation = Column(Boolean, default=False)  # Has automation data

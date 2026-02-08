@@ -562,6 +562,26 @@ def migration_add_als_metadata_fields(engine: Engine) -> None:
         conn.commit()
 
 
+def migration_add_sample_length_fields(engine: Engine) -> None:
+    """Add furthest_sample_end and sample_duration_seconds columns to projects table.
+
+    Separates session clip lengths (recorded samples) from arrangement material.
+    Previously, arrangement_length included ALL clips (arrangement + session),
+    which inflated the reported length when samples existed in session view.
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text("PRAGMA table_info(projects)"))
+        columns = [row[1] for row in result.fetchall()]
+
+        if "furthest_sample_end" not in columns:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN furthest_sample_end REAL"))
+
+        if "sample_duration_seconds" not in columns:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN sample_duration_seconds REAL"))
+
+        conn.commit()
+
+
 # Migration registry - add new migrations here
 # Each migration is a tuple of (version, description, function)
 # NOTE: Must be defined AFTER the migration functions
@@ -619,6 +639,11 @@ MIGRATIONS: list[tuple] = [
         18,
         "Add ALS metadata fields (export_filenames, annotation, master_track_name)",
         migration_add_als_metadata_fields,
+    ),
+    (
+        19,
+        "Add sample length fields (furthest_sample_end, sample_duration_seconds)",
+        migration_add_sample_length_fields,
     ),
 ]
 
