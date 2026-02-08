@@ -3,7 +3,7 @@
 # Single source of truth for version - reads from pyproject.toml via importlib.metadata
 # When installed via pip, this reads from package metadata
 # When running from source, falls back to the hardcoded version below
-_FALLBACK_VERSION = "1.0.5"
+_FALLBACK_VERSION = "1.0.6"
 
 try:
     from importlib.metadata import version as get_version
@@ -22,46 +22,49 @@ WHATS_NEW = {
     "version": __version__,
     "features": [
         (
-            "Faster UI Navigation",
+            "Jaccard Similarity Fixed",
             (
-                "Navigating between project views is now near-instant; "
-                "background workers are properly cancelled when leaving views"
+                "Plugin and device similarity matching now works correctly; "
+                "fixed double-serialization bug that caused set comparisons on individual "
+                "characters instead of plugin/device names"
             ),
         ),
         (
-            "Persistent Metadata in Database",
+            "Plugin Detection Working",
             (
-                "Export filenames, annotations, master track names, and ML feature vectors "
-                "are now stored in the database during scanning, eliminating redundant ALS parsing"
+                "Fixed VST2/VST3/AU plugin detection that was reading XML attributes "
+                "instead of child elements; added VST3 support via Vst3PluginInfo"
             ),
         ),
         (
-            "Optimized Similarity Analysis",
+            "Device Detection Rewritten",
             (
-                "Similar project lookups use pre-computed feature vectors from the database "
-                "instead of re-parsing ALS files on demand"
+                "Replaced broken hardcoded device list with dynamic detection from "
+                "XML Devices containers; catches all native Ableton devices including "
+                "Drift, Meld, Echo, Hybrid Reverb, and any future devices"
             ),
         ),
         (
-            "Thread Lifecycle Improvements",
+            "Arrangement vs Session Clips",
             (
-                "Non-blocking thread cleanup with orphaned thread tracking prevents "
-                "QThread crashes and UI freezes when switching views"
+                "Arrangement length now only counts clips on the arrangement timeline; "
+                "session clip lengths (recorded samples) tracked separately and shown "
+                "in tooltip and Project Information"
             ),
         ),
         (
-            "Scan Logging Improvements",
+            "More Project Metadata",
             (
-                "INFO-level logging for each project being parsed during scans, "
-                "with DEBUG details on extracted metadata"
+                "Project Information now shows time signature, track type breakdown "
+                "(Audio/MIDI/Return), timeline markers, annotation, and session clip length"
             ),
         ),
         (
-            "Bug Fixes",
+            "JSON Storage Fix",
             (
-                "Fixed NoneType comparison errors in similarity scoring, "
-                "dawtool tempo parse errors handled gracefully, "
-                "sidebar navigation now cleans up properties view workers"
+                "Fixed double-encoding of all JSON fields (plugins, devices, samples, "
+                "markers, export filenames) in scanner and watcher; "
+                "all dict builders now use safe deserialization helpers"
             ),
         ),
     ],
@@ -69,6 +72,27 @@ WHATS_NEW = {
 
 # Previous release highlights (for reference in About dialog)
 PREVIOUS_FEATURES = [
+    (
+        "Faster UI Navigation",
+        (
+            "Navigating between project views is now near-instant; "
+            "background workers are properly cancelled when leaving views"
+        ),
+    ),
+    (
+        "Persistent Metadata in Database",
+        (
+            "Export filenames, annotations, master track names, and ML feature vectors "
+            "are now stored in the database during scanning, eliminating redundant ALS parsing"
+        ),
+    ),
+    (
+        "Optimized Similarity Analysis",
+        (
+            "Similar project lookups use pre-computed feature vectors from the database "
+            "instead of re-parsing ALS files on demand"
+        ),
+    ),
     (
         "Automatic Export Detection",
         (

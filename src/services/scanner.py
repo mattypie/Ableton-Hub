@@ -231,7 +231,8 @@ class ScanWorker(QThread):
                         self.logger.debug(
                             f"Scan complete for {path.name}: tempo={metadata.tempo}, "
                             f"tracks={metadata.track_count}, "
-                            f"plugins={len(metadata.plugins) if metadata.plugins else 0}"
+                            f"plugins={len(metadata.plugins) if metadata.plugins else 0}, "
+                            f"devices={len(metadata.devices) if metadata.devices else 0}"
                         )
                 except Exception as e:
                     # Don't fail project creation if parsing fails
@@ -278,7 +279,8 @@ class ScanWorker(QThread):
                                 self.logger.debug(
                                     f"Scan complete for {path.name}: tempo={metadata.tempo}, "
                                     f"tracks={metadata.track_count}, "
-                                    f"plugins={len(metadata.plugins) if metadata.plugins else 0}"
+                                    f"plugins={len(metadata.plugins) if metadata.plugins else 0}, "
+                                    f"devices={len(metadata.devices) if metadata.devices else 0}"
                                 )
                         except Exception as e:
                             # Don't fail update if parsing fails
@@ -299,8 +301,10 @@ class ScanWorker(QThread):
             metadata: ProjectMetadata object from parser.
             als_path: Path to the .als file (for feature vector computation).
         """
-        project.plugins = json.dumps(metadata.plugins) if metadata.plugins else "[]"
-        project.devices = json.dumps(metadata.devices) if metadata.devices else "[]"
+        # Assign lists directly — SQLAlchemy's JSON column handles serialization.
+        # Do NOT use json.dumps() here, as that would double-encode the data.
+        project.plugins = metadata.plugins or []
+        project.devices = metadata.devices or []
         project.tempo = metadata.tempo
         project.time_signature = metadata.time_signature
         project.track_count = metadata.track_count
@@ -326,9 +330,7 @@ class ScanWorker(QThread):
         else:
             project.sample_duration_seconds = None
         project.ableton_version = metadata.ableton_version
-        project.sample_references = (
-            json.dumps(metadata.sample_references) if metadata.sample_references else "[]"
-        )
+        project.sample_references = metadata.sample_references or []
         project.has_automation = metadata.has_automation
         project.last_parsed = datetime.utcnow()
 
@@ -338,14 +340,10 @@ class ScanWorker(QThread):
         project.is_in_key = metadata.is_in_key
 
         # Timeline markers (extracted using dawtool)
-        project.timeline_markers = (
-            json.dumps(metadata.timeline_markers) if metadata.timeline_markers else "[]"
-        )
+        project.timeline_markers = metadata.timeline_markers or []
 
         # ALS project metadata (stored so views don't need to re-parse)
-        project.export_filenames = (
-            json.dumps(metadata.export_filenames) if metadata.export_filenames else None
-        )
+        project.export_filenames = metadata.export_filenames or None
         project.annotation = metadata.annotation
         project.master_track_name = metadata.master_track_name
 

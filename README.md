@@ -4,7 +4,7 @@
 
 # Ableton Hub
 
-**Version 1.0.5**
+**Version 1.0.6**
 
 ## What is Ableton Hub?
 
@@ -552,6 +552,14 @@ Contributions are welcome! Please see the **[Contributing Guide](CONTRIBUTING.md
 ## 🔮 Roadmap
 - **[Feature Development Status](docs/FEATURE_DEVELOPMENT.md)** - What's implemented and what's planned
 - **[Planned Features Roadmap](docs/PLANNED_FEATURES.plan)** - Detailed implementation plans for future features
+
+### v1.0.6 - Jaccard Similarity Fixed, Plugin/Device Detection Working
+- ✅ **Jaccard Similarity Fixed** - Plugin and device similarity matching now works correctly; fixed double-serialization bug that caused character-level set comparisons instead of plugin/device name matching
+- ✅ **Plugin Detection Working** - Fixed VST2/AU plugin detection (XML attribute vs child element bug); added VST3 support via Vst3PluginInfo
+- ✅ **Device Detection Rewritten** - Replaced broken hardcoded device list with dynamic detection from XML Devices containers; catches all native Ableton devices including Drift, Meld, Echo, Hybrid Reverb, and any future devices
+- ✅ **Arrangement vs Session Clips** - Arrangement length now only counts clips on the arrangement timeline; session clip lengths (recorded samples) tracked separately
+- ✅ **More Project Metadata** - Project Information now shows time signature, track type breakdown (Audio/MIDI/Return), timeline markers, annotation, and session clip length
+- ✅ **JSON Storage Fix** - Fixed double-encoding of all JSON fields (plugins, devices, samples, markers, export filenames) in scanner and watcher
 
 ### v1.0.5 - Performance & Stability
 - ✅ **Faster UI Navigation** - Navigating between views is near-instant; background workers properly cancelled when leaving views

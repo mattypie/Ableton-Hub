@@ -215,8 +215,8 @@ class SimilarProjectsDialog(QDialog):
         return {
             "id": project.id,
             "name": project.name,
-            "plugins": project.plugins or [],
-            "devices": project.devices or [],
+            "plugins": project.get_plugins_list(),
+            "devices": project.get_devices_list(),
             "tempo": project.tempo,
             "track_count": project.track_count or 0,
             "audio_tracks": getattr(project, "audio_tracks", 0) or 0,

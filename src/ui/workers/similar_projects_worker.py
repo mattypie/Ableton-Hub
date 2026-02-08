@@ -55,8 +55,8 @@ class SimilarProjectsWorker(BaseWorker):
                         {
                             "id": p.id,
                             "name": p.name,
-                            "plugins": p.plugins or [],
-                            "devices": p.devices or [],
+                            "plugins": p.get_plugins_list(),
+                            "devices": p.get_devices_list(),
                             "tempo": p.tempo,
                             "track_count": p.track_count or 0,
                             "audio_tracks": getattr(p, "audio_tracks", 0) or 0,

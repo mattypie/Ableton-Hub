@@ -166,8 +166,8 @@ class SmartCollectionService:
                     ref_dict = {
                         "id": reference_project.id,
                         "name": reference_project.name,
-                        "plugins": reference_project.plugins or [],
-                        "devices": reference_project.devices or [],
+                        "plugins": reference_project.get_plugins_list(),
+                        "devices": reference_project.get_devices_list(),
                         "tempo": reference_project.tempo,
                         "track_count": reference_project.track_count,
                         "audio_tracks": getattr(reference_project, "audio_tracks", 0),
@@ -187,8 +187,8 @@ class SmartCollectionService:
                             {
                                 "id": p.id,
                                 "name": p.name,
-                                "plugins": p.plugins or [],
-                                "devices": p.devices or [],
+                                "plugins": p.get_plugins_list(),
+                                "devices": p.get_devices_list(),
                                 "tempo": p.tempo,
                                 "track_count": p.track_count,
                                 "audio_tracks": getattr(p, "audio_tracks", 0),

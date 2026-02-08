@@ -568,6 +568,9 @@ def migration_add_sample_length_fields(engine: Engine) -> None:
     Separates session clip lengths (recorded samples) from arrangement material.
     Previously, arrangement_length included ALL clips (arrangement + session),
     which inflated the reported length when samples existed in session view.
+
+    Also clears stale arrangement_length/arrangement_duration_seconds and
+    resets last_parsed so projects are re-parsed with the corrected logic.
     """
     with engine.connect() as conn:
         result = conn.execute(text("PRAGMA table_info(projects)"))
@@ -578,6 +581,15 @@ def migration_add_sample_length_fields(engine: Engine) -> None:
 
         if "sample_duration_seconds" not in columns:
             conn.execute(text("ALTER TABLE projects ADD COLUMN sample_duration_seconds REAL"))
+
+        # Clear stale arrangement_length values that included session clips,
+        # and reset last_parsed so the next scan re-parses with corrected logic
+        conn.execute(text("""
+            UPDATE projects
+            SET arrangement_length = NULL,
+                arrangement_duration_seconds = NULL,
+                last_parsed = NULL
+        """))
 
         conn.commit()
 

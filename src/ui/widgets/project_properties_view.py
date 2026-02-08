@@ -709,9 +709,7 @@ class ProjectPropertiesView(QWidget):
             if marker_count > 0:
                 marker_names = [m.get("text", "") for m in markers if m.get("text")]
                 if marker_names:
-                    self.markers_label.setText(
-                        f"{marker_count} ({', '.join(marker_names[:5])})"
-                    )
+                    self.markers_label.setText(f"{marker_count} ({', '.join(marker_names[:5])})")
                     if len(marker_names) > 5:
                         self.markers_label.setToolTip(", ".join(marker_names))
                 else:
@@ -986,8 +984,8 @@ class ProjectPropertiesView(QWidget):
         project_data: dict[str, Any] = {
             "id": self._project.id,
             "name": self._project.name,
-            "plugins": self._project.plugins or [],
-            "devices": self._project.devices or [],
+            "plugins": self._project.get_plugins_list(),
+            "devices": self._project.get_devices_list(),
             "tempo": self._project.tempo,
             "track_count": self._project.track_count,
             "audio_tracks": getattr(self._project, "audio_tracks", 0),

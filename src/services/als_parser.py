@@ -442,108 +442,81 @@ class ALSParser:
         # Look for PluginDevice elements (VST/AU plugins)
         for plugin_elem in root.iter():
             if "PluginDevice" in plugin_elem.tag:
-                # Try to get plugin name
                 plugin_name = None
 
-                # Check for VSTPluginInfo
+                # Check for VstPluginInfo (VST2)
                 vst_info = plugin_elem.find(".//VstPluginInfo")
                 if vst_info is not None:
-                    plugin_name = vst_info.get("PlugName") or vst_info.get("Name")
+                    # PlugName/Name are child elements with Value attribute,
+                    # e.g. <PlugName Value="Serum" />
+                    plug_name_elem = vst_info.find("PlugName")
+                    if plug_name_elem is not None:
+                        plugin_name = plug_name_elem.get("Value")
+                    if not plugin_name:
+                        name_elem = vst_info.find("Name")
+                        if name_elem is not None:
+                            plugin_name = name_elem.get("Value")
                     if plugin_name and plugin_name not in seen_plugins:
                         plugins.append(plugin_name)
                         seen_plugins.add(plugin_name)
+                        continue
 
-                # Check for AUPluginInfo (Mac)
+                # Check for Vst3PluginInfo (VST3)
+                vst3_info = plugin_elem.find(".//Vst3PluginInfo")
+                if vst3_info is not None:
+                    name_elem = vst3_info.find("Name")
+                    if name_elem is not None:
+                        plugin_name = name_elem.get("Value")
+                    if not plugin_name:
+                        plug_name_elem = vst3_info.find("PlugName")
+                        if plug_name_elem is not None:
+                            plugin_name = plug_name_elem.get("Value")
+                    if plugin_name and plugin_name not in seen_plugins:
+                        plugins.append(plugin_name)
+                        seen_plugins.add(plugin_name)
+                        continue
+
+                # Check for AuPluginInfo (Mac AU)
                 au_info = plugin_elem.find(".//AuPluginInfo")
                 if au_info is not None:
-                    plugin_name = au_info.get("Name") or au_info.get("PlugName")
+                    name_elem = au_info.find("Name")
+                    if name_elem is not None:
+                        plugin_name = name_elem.get("Value")
+                    if not plugin_name:
+                        plug_name_elem = au_info.find("PlugName")
+                        if plug_name_elem is not None:
+                            plugin_name = plug_name_elem.get("Value")
                     if plugin_name and plugin_name not in seen_plugins:
                         plugins.append(plugin_name)
                         seen_plugins.add(plugin_name)
+                        continue
 
-        # Look for Ableton devices
-        device_types = [
-            "AudioEffectGroupDevice",
-            "MidiEffectGroupDevice",
-            "InstrumentGroupDevice",
-            "DrumGroupDevice",
-            "AudioEffectDevice",
-            "MidiEffectDevice",
-            "InstrumentDevice",
-            "Operator",
-            "Simpler",
-            "Sampler",
-            "Impulse",
-            "DrumRack",
-            "Compressor",
-            "Gate",
-            "EQ8",
-            "EQThree",
-            "AutoFilter",
-            "AutoPan",
-            "Chorus",
-            "Flanger",
-            "Phaser",
-            "Reverb",
-            "Delay",
-            "BeatRepeat",
-            "Looper",
-            "Utility",
-            "Limiter",
-            "MultibandCompressor",
-            "GlueCompressor",
-            "Saturator",
-            "Erosion",
-            "Redux",
-            "Overdrive",
-            "Cabinet",
-            "Amp",
-            "DynamicTube",
-            "FrequencyShifter",
-            "GrainDelay",
-            "PingPongDelay",
-            "SimpleDelay",
-            "Spectrum",
-            "Tuner",
-            "Vocoder",
-            "Arpeggiator",
-            "Chord",
-            "NoteLength",
-            "Pitch",
-            "Random",
-            "Scale",
-            "Velocity",
-            "MidiArpeggiator",
-            "MidiChord",
-            "MidiNoteLength",
-            "MidiPitcher",
-            "MidiRandom",
-            "MidiScale",
-            "MidiVelocity",
-            "Analog",
-            "Collision",
-            "Electric",
-            "Tension",
-            "Wavetable",
-            "MidiArp",
-            "MidiChord",
-            "MidiNoteLength",
-            "MidiPitcher",
-            "MidiRandom",
-            "MidiScale",
-            "MidiVelocity",
-        ]
+        # Look for Ableton native devices by finding all <Devices> containers
+        # and enumerating their direct children. Anything that isn't a PluginDevice
+        # is a native Ableton device. This is future-proof and catches all devices.
+        #
+        # Tags that are plugin wrappers (already counted above):
+        plugin_tags = {"PluginDevice"}
 
-        for device_type in device_types:
-            for device_elem in root.iter():
-                if device_type in device_elem.tag:
-                    device_name = device_type
-                    # Try to get a more specific name
-                    name_elem = device_elem.find(".//UserName")
-                    if name_elem is not None and name_elem.text:
-                        device_name = name_elem.text
-                    elif device_elem.get("Name"):
-                        device_name = device_elem.get("Name") or ""
+        for devices_container in root.iter():
+            if devices_container.tag == "Devices":
+                for device_elem in devices_container:
+                    tag = device_elem.tag
+                    if tag in plugin_tags:
+                        continue  # Already handled in plugin detection
+
+                    # Get device display name:
+                    # 1. Check UserName Value (user-renamed device)
+                    # 2. Fall back to tag name (e.g. "Compressor2", "Eq8")
+                    device_name = None
+                    user_name_elem = device_elem.find("UserName")
+                    if user_name_elem is not None:
+                        user_val = user_name_elem.get("Value", "")
+                        if user_val.strip():
+                            device_name = user_val.strip()
+
+                    if not device_name:
+                        device_name = tag
 
                     if device_name and device_name not in seen_devices:
                         devices.append(device_name)
