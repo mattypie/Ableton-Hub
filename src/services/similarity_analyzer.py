@@ -12,9 +12,9 @@ NOTE: Heavy imports (numpy, sklearn) are deferred until first use
 to avoid slowing down application startup.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 # Type checking imports (not loaded at runtime)
@@ -49,10 +49,6 @@ def _check_sklearn():
         except ImportError:
             _SKLEARN_AVAILABLE = False
     return _SKLEARN_AVAILABLE
-
-
-# Import feature extractor (deferred - only imported when this module is used)
-from .ml_feature_extractor import MLFeatureExtractor, ProjectFeatureVector
 
 
 @dataclass
@@ -132,24 +128,18 @@ class SimilarityAnalyzer:
 
     def __init__(
         self,
-        feature_extractor: MLFeatureExtractor | None = None,
         weights: dict[str, float] | None = None,
     ):
         """Initialize the similarity analyzer.
 
         Args:
-            feature_extractor: MLFeatureExtractor instance to use.
             weights: Custom weights for similarity components.
         """
-        self._extractor = feature_extractor or MLFeatureExtractor()
         self._weights = weights or self.DEFAULT_WEIGHTS
 
         # Normalize weights to sum to 1
         total = sum(self._weights.values())
         self._weights = {k: v / total for k, v in self._weights.items()}
-
-        # Cache for feature vectors
-        self._feature_cache: dict[int, ProjectFeatureVector] = {}
 
         # Cache for similarity results
         self._similarity_cache: dict[tuple[int, int], SimilarityResult] = {}
@@ -265,18 +255,19 @@ class SimilarityAnalyzer:
         similarities = []
 
         # Track count similarity (normalized difference)
-        tracks_a = project_a.get("track_count", 0)
-        tracks_b = project_b.get("track_count", 0)
+        # Use `or 0` to coerce None values from the database to 0
+        tracks_a = project_a.get("track_count") or 0
+        tracks_b = project_b.get("track_count") or 0
         if tracks_a > 0 or tracks_b > 0:
             max_tracks = max(tracks_a, tracks_b)
             track_sim = 1.0 - abs(tracks_a - tracks_b) / max_tracks
             similarities.append(track_sim)
 
         # Audio/MIDI ratio similarity
-        audio_a = project_a.get("audio_tracks", 0)
-        midi_a = project_a.get("midi_tracks", 0)
-        audio_b = project_b.get("audio_tracks", 0)
-        midi_b = project_b.get("midi_tracks", 0)
+        audio_a = project_a.get("audio_tracks") or 0
+        midi_a = project_a.get("midi_tracks") or 0
+        audio_b = project_b.get("audio_tracks") or 0
+        midi_b = project_b.get("midi_tracks") or 0
 
         if (audio_a + midi_a) > 0 and (audio_b + midi_b) > 0:
             ratio_a = audio_a / (audio_a + midi_a)
@@ -285,8 +276,8 @@ class SimilarityAnalyzer:
             similarities.append(ratio_sim)
 
         # Arrangement length similarity
-        length_a = project_a.get("arrangement_length", 0)
-        length_b = project_b.get("arrangement_length", 0)
+        length_a = project_a.get("arrangement_length") or 0
+        length_b = project_b.get("arrangement_length") or 0
         if length_a > 0 and length_b > 0:
             max_length = max(length_a, length_b)
             length_sim = 1.0 - abs(length_a - length_b) / max_length
@@ -300,31 +291,17 @@ class SimilarityAnalyzer:
     def _compute_feature_similarity(
         self, project_a: dict[str, Any], project_b: dict[str, Any]
     ) -> float:
-        """Compute cosine similarity between feature vectors.
+        """Compute cosine similarity between pre-computed feature vectors.
 
-        If feature vectors aren't available, extracts them from ALS files.
+        Feature vectors should be computed and stored during project scanning.
+        If a project doesn't have a stored vector, returns neutral similarity
+        rather than re-parsing ALS files on the fly.
         """
-        # Try to get cached feature vectors
         vector_a = project_a.get("feature_vector")
         vector_b = project_b.get("feature_vector")
 
-        # Extract if needed
-        if vector_a is None and project_a.get("als_path"):
-            pf = self._extractor.extract_project_features(
-                Path(project_a["als_path"]), project_a.get("id")
-            )
-            if pf:
-                vector_a = pf.combined_vector
-
-        if vector_b is None and project_b.get("als_path"):
-            pf = self._extractor.extract_project_features(
-                Path(project_b["als_path"]), project_b.get("id")
-            )
-            if pf:
-                vector_b = pf.combined_vector
-
         if vector_a is None or vector_b is None:
-            return 0.5  # Can't compute - neutral similarity
+            return 0.5  # No stored vector - neutral similarity
 
         # Compute cosine similarity
         np = _get_numpy()
@@ -357,6 +334,7 @@ class SimilarityAnalyzer:
         candidate_projects: list[dict[str, Any]],
         top_n: int = 10,
         min_similarity: float = 0.3,
+        cancel_check: Callable[[], bool] | None = None,
     ) -> list[SimilarProject]:
         """Find projects similar to a reference project.
 
@@ -365,6 +343,8 @@ class SimilarityAnalyzer:
             candidate_projects: List of projects to compare against.
             top_n: Maximum number of similar projects to return.
             min_similarity: Minimum similarity score threshold.
+            cancel_check: Optional callable that returns True if the operation
+                should be cancelled. Checked between each candidate comparison.
 
         Returns:
             List of SimilarProject objects, sorted by similarity (descending).
@@ -374,6 +354,10 @@ class SimilarityAnalyzer:
         ref_id = reference_project.get("id", 0)
 
         for candidate in candidate_projects:
+            # Check for cancellation between each candidate
+            if cancel_check and cancel_check():
+                return []
+
             cand_id = candidate.get("id", 0)
 
             # Skip self-comparison
@@ -482,6 +466,4 @@ class SimilarityAnalyzer:
 
     def clear_cache(self) -> None:
         """Clear all caches."""
-        self._feature_cache.clear()
         self._similarity_cache.clear()
-        self._extractor.clear_cache()

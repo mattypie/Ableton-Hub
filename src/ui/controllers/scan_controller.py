@@ -305,3 +305,15 @@ class ProjectRescanWorker(QThread):
         project.musical_key = metadata.musical_key
         project.scale_type = metadata.scale_type
         project.is_in_key = metadata.is_in_key
+
+        # Timeline markers (extracted using dawtool)
+        project.timeline_markers = (
+            json.dumps(metadata.timeline_markers) if metadata.timeline_markers else "[]"
+        )
+
+        # ALS project metadata
+        project.export_filenames = (
+            json.dumps(metadata.export_filenames) if metadata.export_filenames else None
+        )
+        project.annotation = metadata.annotation
+        project.master_track_name = metadata.master_track_name

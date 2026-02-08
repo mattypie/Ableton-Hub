@@ -15,13 +15,12 @@ from PyQt6.QtWidgets import (
 )
 
 from ...database import Project, get_session
-from ...services.recommendation_engine import RecommendationEngine
 from ...services.similarity_analyzer import SimilarityAnalyzer
 from ..theme import AbletonTheme
 
 
 class RecommendationsPanel(QWidget):
-    """Panel showing project recommendations based on similarity."""
+    """Panel showing project similarity analysis."""
 
     project_selected = pyqtSignal(int)  # Emitted when a project is selected
 
@@ -29,7 +28,6 @@ class RecommendationsPanel(QWidget):
         super().__init__(parent)
 
         self._analyzer = SimilarityAnalyzer()
-        self._recommendation_engine = RecommendationEngine()
         self._current_project_id: int | None = None
 
         self._setup_ui()
@@ -49,7 +47,7 @@ class RecommendationsPanel(QWidget):
         header.addStretch()
 
         refresh_btn = QPushButton("Refresh")
-        refresh_btn.clicked.connect(self._refresh_recommendations)
+        refresh_btn.clicked.connect(self._refresh_similar)
         header.addWidget(refresh_btn)
 
         layout.addLayout(header)
@@ -73,43 +71,27 @@ class RecommendationsPanel(QWidget):
         explanation_layout = QVBoxLayout(explanation_group)
         explanation_layout.setSpacing(8)
 
-        similar_explanation = QLabel(
-            "<b>Similar Projects</b> uses <i>Jaccard set similarity</i> to compare projects:<br>"
-            "• <b>Plugins</b> (20%): Shared VST/AU plugins (e.g., both use Serum, FabFilter Pro-Q)<br>"
-            "• <b>Devices</b> (15%): Shared Ableton devices (e.g., both use Wavetable, Compressor)<br>"
-            "• <b>Tempo</b> (15%): How close the BPM values are<br>"
-            "• <b>Structure</b> (15%): Track counts, clips, arrangement length<br>"
-            "• <b>Features</b> (35%): Cosine similarity of extracted feature vectors"
-        )
-        similar_explanation.setStyleSheet(
-            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 11px;"
-        )
-        similar_explanation.setWordWrap(True)
-        explanation_layout.addWidget(similar_explanation)
-
-        jaccard_explanation = QLabel(
-            "<b>Jaccard Formula:</b> |A ∩ B| / |A ∪ B|<br>"
+        explanation = QLabel(
+            "Projects are compared using a <b>weighted hybrid similarity</b> score:<br><br>"
+            "&#8226; <b>Feature Vectors (35%)</b>: Cosine similarity of project feature vectors "
+            "(track counts, plugin/device counts, tempo, arrangement length, ASD clip data). "
+            "Computed during scanning and stored in the database.<br>"
+            "&#8226; <b>Plugins (20%)</b>: Jaccard set similarity of VST/AU plugins "
+            "(e.g., both use Serum and FabFilter Pro-Q).<br>"
+            "&#8226; <b>Devices (15%)</b>: Jaccard set similarity of Ableton devices "
+            "(e.g., both use Wavetable and Compressor).<br>"
+            "&#8226; <b>Tempo (15%)</b>: BPM proximity (identical = 100%, >50 BPM apart = 0%).<br>"
+            "&#8226; <b>Structure (15%)</b>: Track counts, audio/MIDI ratio, arrangement length.<br>"
+            "<br>"
+            "<b>Jaccard Formula:</b> |A &#8745; B| / |A &#8746; B|<br>"
             "Example: Project A uses [Serum, Massive, Pro-Q], Project B uses [Serum, Pro-Q, Ozone]<br>"
-            "→ Intersection = 2 (Serum, Pro-Q), Union = 4 → Jaccard = 2/4 = 50%"
+            "&#8594; Intersection = 2 (Serum, Pro-Q), Union = 4 &#8594; Jaccard = 2/4 = 50%"
         )
-        jaccard_explanation.setStyleSheet(
+        explanation.setStyleSheet(
             f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 11px;"
         )
-        jaccard_explanation.setWordWrap(True)
-        explanation_layout.addWidget(jaccard_explanation)
-
-        ml_explanation = QLabel(
-            "<b>ML-Based Matches</b> uses content-based filtering:<br>"
-            "• <b>Plugin co-occurrence</b>: Projects using similar plugin combinations<br>"
-            "• <b>Device patterns</b>: Common device chain patterns<br>"
-            "• <b>Tempo affinity</b>: Plugins commonly used at similar tempos<br>"
-            "Example: If you often use Serum + OTT together, projects with both score higher"
-        )
-        ml_explanation.setStyleSheet(
-            f"color: {AbletonTheme.COLORS['text_secondary']}; font-size: 11px;"
-        )
-        ml_explanation.setWordWrap(True)
-        explanation_layout.addWidget(ml_explanation)
+        explanation.setWordWrap(True)
+        explanation_layout.addWidget(explanation)
 
         layout.addWidget(explanation_group)
 
@@ -147,23 +129,13 @@ class RecommendationsPanel(QWidget):
 
         layout.addWidget(similar_group)
 
-        # ML-Based Matches group
-        recommendations_group = QGroupBox("ML-Based Matches")
-        recommendations_layout = QVBoxLayout(recommendations_group)
-
-        self.recommendations_list = QListWidget()
-        self.recommendations_list.itemDoubleClicked.connect(self._on_project_double_click)
-        recommendations_layout.addWidget(self.recommendations_list)
-
-        layout.addWidget(recommendations_group)
-
         layout.addStretch()
 
     def set_project(self, project_id: int) -> None:
-        """Set the current project and load recommendations."""
+        """Set the current project and load similar projects."""
         self._current_project_id = project_id
         self._select_combo_by_project_id(project_id)
-        self._refresh_recommendations()
+        self._refresh_similar()
 
     def _populate_project_combo(self) -> None:
         """Populate the project combo box with all projects."""
@@ -209,12 +181,11 @@ class RecommendationsPanel(QWidget):
         project_id = self._project_id_map.get(index)
         if project_id is not None:
             self._current_project_id = project_id
-            self._refresh_recommendations()
+            self._refresh_similar()
         else:
             # Placeholder selected - clear results
             self._current_project_id = None
             self.similar_list.clear()
-            self.recommendations_list.clear()
             self.similar_list.addItem(QListWidgetItem("Select a project to see similar projects"))
 
     def _select_combo_by_project_id(self, project_id: int) -> None:
@@ -226,11 +197,10 @@ class RecommendationsPanel(QWidget):
                 self.project_combo.blockSignals(False)
                 return
 
-    def _refresh_recommendations(self) -> None:
-        """Refresh recommendations for the current project."""
+    def _refresh_similar(self) -> None:
+        """Refresh similar projects for the current project."""
         if not self._current_project_id:
             self.similar_list.clear()
-            self.recommendations_list.clear()
             self.similar_list.addItem(QListWidgetItem("Select a project to see similar projects"))
             return
 
@@ -277,37 +247,27 @@ class RecommendationsPanel(QWidget):
                         item = QListWidgetItem(item_text)
                         item.setData(Qt.ItemDataRole.UserRole, sim_project.project_id)
 
-                        # Build tooltip
-                        tooltip = f"Similarity: {score_percent}%"
+                        # Build tooltip with score breakdown
+                        tooltip_parts = [f"Overall Similarity: {score_percent}%"]
                         if sim_project.similarity_result:
-                            explanation = self._analyzer.get_similarity_explanation(
-                                sim_project.similarity_result
+                            r = sim_project.similarity_result
+                            tooltip_parts.append(
+                                f"  Feature: {r.feature_similarity:.0%}  "
+                                f"Plugins: {r.plugin_similarity:.0%}  "
+                                f"Devices: {r.device_similarity:.0%}"
                             )
-                            tooltip += f"\n{explanation}"
-                        item.setToolTip(tooltip)
+                            tooltip_parts.append(
+                                f"  Tempo: {r.tempo_similarity:.0%}  "
+                                f"Structure: {r.structural_similarity:.0%}"
+                            )
+                            explanation = self._analyzer.get_similarity_explanation(r)
+                            tooltip_parts.append(explanation)
+                        item.setToolTip("\n".join(tooltip_parts))
 
                         self.similar_list.addItem(item)
                 else:
-                    self.similar_list.addItem(QListWidgetItem("No similar projects found"))
-
-                # Get recommendations
-                recommendations = self._recommendation_engine.recommend_similar_projects(
-                    project=project_dict, n_recommendations=10, exclude_ids=set()
-                )
-
-                # Populate recommendations list
-                self.recommendations_list.clear()
-                if recommendations.recommendations:
-                    for rec in recommendations.recommendations:
-                        score_percent = int(rec.score * 100)
-                        item_text = f"{rec.item_name} ({score_percent}% match)"
-                        item = QListWidgetItem(item_text)
-                        item.setData(Qt.ItemDataRole.UserRole, rec.item_id)
-                        item.setToolTip(f"{rec.reason}\nScore: {score_percent}%")
-                        self.recommendations_list.addItem(item)
-                else:
-                    self.recommendations_list.addItem(
-                        QListWidgetItem("No recommendations available")
+                    self.similar_list.addItem(
+                        QListWidgetItem("No similar projects found (min similarity: 30%)")
                     )
 
             finally:
@@ -317,7 +277,6 @@ class RecommendationsPanel(QWidget):
 
         except Exception as e:
             self.similar_list.clear()
-            self.recommendations_list.clear()
             self.similar_list.addItem(QListWidgetItem(f"Error: {str(e)}"))
             self.progress_bar.setVisible(False)
 
@@ -329,11 +288,16 @@ class RecommendationsPanel(QWidget):
             "plugins": project.plugins or [],
             "devices": project.devices or [],
             "tempo": project.tempo,
-            "track_count": project.track_count,
-            "audio_tracks": getattr(project, "audio_tracks", 0),
-            "midi_tracks": getattr(project, "midi_tracks", 0),
-            "arrangement_length": project.arrangement_length,
+            "track_count": project.track_count or 0,
+            "audio_tracks": getattr(project, "audio_tracks", 0) or 0,
+            "midi_tracks": getattr(project, "midi_tracks", 0) or 0,
+            "arrangement_length": project.arrangement_length or 0,
             "als_path": project.file_path,
+            "feature_vector": (
+                project.get_feature_vector_list()
+                if hasattr(project, "get_feature_vector_list")
+                else None
+            ),
         }
 
     def _on_project_double_click(self, item: QListWidgetItem) -> None:

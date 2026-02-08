@@ -218,11 +218,16 @@ class SimilarProjectsDialog(QDialog):
             "plugins": project.plugins or [],
             "devices": project.devices or [],
             "tempo": project.tempo,
-            "track_count": project.track_count,
-            "audio_tracks": getattr(project, "audio_tracks", 0),
-            "midi_tracks": getattr(project, "midi_tracks", 0),
-            "arrangement_length": project.arrangement_length,
+            "track_count": project.track_count or 0,
+            "audio_tracks": getattr(project, "audio_tracks", 0) or 0,
+            "midi_tracks": getattr(project, "midi_tracks", 0) or 0,
+            "arrangement_length": project.arrangement_length or 0,
             "als_path": project.file_path,
+            "feature_vector": (
+                project.get_feature_vector_list()
+                if hasattr(project, "get_feature_vector_list")
+                else None
+            ),
         }
 
     def _on_project_double_click(self, item: QListWidgetItem) -> None:

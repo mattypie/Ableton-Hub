@@ -1424,6 +1424,10 @@ class MainWindow(QMainWindow):
         Args:
             view: View to show ("projects", "collections", "locations", "link", "new_collection", "favorites", "recent")
         """
+        # Clean up properties view workers when navigating away via sidebar
+        if self.view_manager.get_current_view() == ViewManager.VIEW_PROPERTIES:
+            self.project_properties_view.cleanup()
+
         # Reset missing projects view when navigating away from projects view
         if view != "projects" and self._show_missing_projects:
             self._show_missing_projects = False
@@ -1484,6 +1488,7 @@ class MainWindow(QMainWindow):
 
     def _on_properties_back(self) -> None:
         """Handle back button from properties view."""
+        self.project_properties_view.cleanup()
         self.view_manager.switch_to_view(ViewManager.VIEW_PROJECTS)
         self._load_projects()
 

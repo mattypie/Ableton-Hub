@@ -32,7 +32,7 @@ from ...services.audio_player import AudioPlayer, format_duration
 from ...utils.fuzzy_match import extract_song_name
 from ..theme import AbletonTheme
 from ..widgets.tag_editor import ProjectTagSelector
-from ..workers import ALSParserWorker, BackupScanWorker, SimilarProjectsWorker
+from ..workers import BackupScanWorker, SimilarProjectsWorker
 
 
 class ProjectPropertiesView(QWidget):
@@ -51,12 +51,15 @@ class ProjectPropertiesView(QWidget):
         self._als_metadata: dict[str, Any] = {}
 
         # Background workers and their threads
-        self._als_thread: QThread | None = None
-        self._als_worker: ALSParserWorker | None = None
         self._backup_thread: QThread | None = None
         self._backup_worker: BackupScanWorker | None = None
         self._similar_thread: QThread | None = None
         self._similar_worker: SimilarProjectsWorker | None = None
+
+        # Keep references to threads that are still running when we detach them,
+        # so Python's garbage collector doesn't destroy the C++ QThread object
+        # while the OS thread is still active (which causes a fatal crash).
+        self._orphaned_threads: list[QThread] = []
 
         self._setup_ui()
         self._connect_audio_signals()
@@ -568,7 +571,6 @@ class ProjectPropertiesView(QWidget):
 
         # Start background workers for heavy operations
         if self._project:
-            self._start_als_parser()
             self._start_backup_scan()
             self._start_similar_analysis()
 
@@ -761,11 +763,8 @@ class ProjectPropertiesView(QWidget):
                 item.setFlags(Qt.ItemFlag.NoItemFlags)
                 self.exports_list.addItem(item)
 
-            # Reset loading indicators
-            self.als_exports_label.setText("Loading export history...")
-            self.als_exports_label.setStyleSheet(
-                f"color: {AbletonTheme.COLORS['text_secondary']}; font-style: italic;"
-            )
+            # Export history from ALS metadata (stored in DB from scan)
+            self._update_als_exports_display()
 
             self.backups_list.clear()
             self.backups_loading_label.setText("Scanning for backups...")
@@ -778,40 +777,39 @@ class ProjectPropertiesView(QWidget):
         finally:
             session.close()
 
-    def _start_als_parser(self) -> None:
-        """Start ALS parsing in background thread."""
+    def _update_als_exports_display(self) -> None:
+        """Update the export history display from stored DB metadata."""
         if not self._project:
+            self.als_exports_label.setText("No project loaded")
+            self.als_exports_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']};")
             return
-
-        self._als_thread = QThread()
-        # Create worker without parent - required for moveToThread
-        self._als_worker = ALSParserWorker(self._project.file_path, None)
-        self._als_worker.moveToThread(self._als_thread)
-
-        self._als_thread.started.connect(self._als_worker.run)
-        self._als_worker.finished.connect(self._on_als_parsed)
-        self._als_worker.error.connect(self._on_als_error)
-        self._als_worker.finished.connect(self._als_thread.quit)
-        self._als_worker.error.connect(self._als_thread.quit)
-
-        self._als_thread.start()
-
-    def _on_als_parsed(self, metadata: dict) -> None:
-        """Handle ALS parsing completion."""
-        self._als_metadata = metadata
 
         info_parts = []
 
-        if metadata.get("export_filenames"):
-            info_parts.append(f"📁 Export names: {', '.join(metadata['export_filenames'])}")
+        # Export filenames (stored as JSON)
+        export_filenames = self._project.export_filenames
+        if isinstance(export_filenames, str):
+            import json
 
-        if metadata.get("annotation"):
-            anno = metadata["annotation"].strip()
+            try:
+                export_filenames = json.loads(export_filenames)
+            except (json.JSONDecodeError, TypeError):
+                export_filenames = []
+
+        if export_filenames:
+            info_parts.append(f"📁 Export names: {', '.join(export_filenames)}")
+            # Store in als_metadata for suggest button
+            self._als_metadata["export_filenames"] = export_filenames
+
+        if self._project.annotation:
+            anno = self._project.annotation.strip()
             if len(anno) < 200:
                 info_parts.append(f"📝 Annotation: {anno}")
+            self._als_metadata["annotation"] = self._project.annotation
 
-        if metadata.get("master_track_name"):
-            info_parts.append(f"🎚️ Master track: {metadata['master_track_name']}")
+        if self._project.master_track_name:
+            info_parts.append(f"🎚️ Master track: {self._project.master_track_name}")
+            self._als_metadata["master_track_name"] = self._project.master_track_name
 
         if info_parts:
             self.als_exports_label.setText("\n".join(info_parts))
@@ -819,11 +817,6 @@ class ProjectPropertiesView(QWidget):
         else:
             self.als_exports_label.setText("No export history found in project file")
             self.als_exports_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']};")
-
-    def _on_als_error(self, error: str) -> None:
-        """Handle ALS parsing error."""
-        self.als_exports_label.setText(f"Error reading project: {error}")
-        self.als_exports_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_secondary']};")
 
     def _start_backup_scan(self) -> None:
         """Start backup scanning in background thread."""
@@ -880,7 +873,7 @@ class ProjectPropertiesView(QWidget):
         self.similar_loading_label.setText("Analyzing similar projects...")
         self.similar_loading_label.setVisible(True)
 
-        # Prepare project data for worker
+        # Prepare project data for worker (include stored feature vector)
         project_data: dict[str, Any] = {
             "id": self._project.id,
             "name": self._project.name,
@@ -892,25 +885,16 @@ class ProjectPropertiesView(QWidget):
             "midi_tracks": getattr(self._project, "midi_tracks", 0),
             "arrangement_length": self._project.arrangement_length,
             "als_path": self._project.file_path,
+            "feature_vector": (
+                self._project.get_feature_vector_list()
+                if hasattr(self._project, "get_feature_vector_list")
+                else None
+            ),
         }
 
         # Stop existing thread if running
         if self._similar_thread and self._similar_thread.isRunning():
-            if self._similar_worker:
-                self._similar_worker.cancel()
-                # Disconnect signals before cleanup
-                try:
-                    self._similar_worker.finished.disconnect()
-                    self._similar_worker.error.disconnect()
-                except (TypeError, RuntimeError):
-                    pass  # Signals may already be disconnected
-            self._similar_thread.quit()
-            if not self._similar_thread.wait(2000):  # Wait up to 2 seconds
-                self._similar_thread.terminate()
-                self._similar_thread.wait(1000)
-            self._similar_thread.deleteLater()
-            if self._similar_worker:
-                self._similar_worker.deleteLater()
+            self._safely_stop_thread(self._similar_thread, self._similar_worker)
             self._similar_thread = None
             self._similar_worker = None
 
@@ -952,65 +936,73 @@ class ProjectPropertiesView(QWidget):
         item.setFlags(Qt.ItemFlag.NoItemFlags)
         self.similar_projects_list.addItem(item)
 
+    def _safely_stop_thread(self, thread: QThread | None, worker: object | None) -> None:
+        """Safely stop a worker thread without blocking the UI.
+
+        Disconnects all worker signals, requests cancellation, asks the thread to quit,
+        and keeps a reference to still-running threads so Python's GC doesn't destroy
+        the C++ QThread object while the OS thread is still active.
+
+        This method is non-blocking - it never waits for threads to stop.
+
+        Args:
+            thread: The QThread to stop.
+            worker: The worker object running on the thread.
+        """
+        # Purge orphaned threads that have since finished or been deleted by Qt
+        still_running = []
+        for t in self._orphaned_threads:
+            try:
+                if t.isRunning():
+                    still_running.append(t)
+            except RuntimeError:
+                pass  # C++ object already deleted by deleteLater
+        self._orphaned_threads = still_running
+
+        if worker:
+            # Cancel the worker so it exits at the next checkpoint
+            if hasattr(worker, "cancel"):
+                worker.cancel()
+            # Disconnect all signals to prevent callbacks into stale UI state
+            try:
+                worker.finished.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+            try:
+                worker.error.disconnect()
+            except (TypeError, RuntimeError):
+                pass
+
+        if thread is None:
+            if worker:
+                worker.deleteLater()
+            return
+
+        if not thread.isRunning():
+            # Thread already stopped - safe to clean up immediately
+            thread.deleteLater()
+            if worker:
+                worker.deleteLater()
+            return
+
+        # Thread is still running - request quit, defer cleanup, don't block.
+        # Connect finished->deleteLater so cleanup happens when thread stops.
+        thread.finished.connect(thread.deleteLater)
+        if worker:
+            thread.finished.connect(worker.deleteLater)
+        thread.quit()
+
+        # Keep a Python reference so GC doesn't destroy the QThread
+        # while the OS thread is still active (causes fatal crash).
+        self._orphaned_threads.append(thread)
+
     def _stop_workers(self) -> None:
         """Stop all background workers."""
-        # Stop ALS parser worker
-        if self._als_worker:
-            self._als_worker.cancel()
-            # Disconnect signals before cleanup
-            try:
-                self._als_worker.finished.disconnect()
-                self._als_worker.error.disconnect()
-            except (TypeError, RuntimeError):
-                pass  # Signals may already be disconnected
-        if self._als_thread and self._als_thread.isRunning():
-            self._als_thread.quit()
-            if not self._als_thread.wait(2000):  # Wait up to 2 seconds
-                self._als_thread.terminate()
-                self._als_thread.wait(1000)
-            self._als_thread.deleteLater()
-        if self._als_worker:
-            self._als_worker.deleteLater()
-        self._als_thread = None
-        self._als_worker = None
-
-        # Stop backup scan worker
-        if self._backup_worker:
-            self._backup_worker.cancel()
-            # Disconnect signals before cleanup
-            try:
-                self._backup_worker.finished.disconnect()
-                self._backup_worker.error.disconnect()
-            except (TypeError, RuntimeError):
-                pass  # Signals may already be disconnected
-        if self._backup_thread and self._backup_thread.isRunning():
-            self._backup_thread.quit()
-            if not self._backup_thread.wait(2000):  # Wait up to 2 seconds
-                self._backup_thread.terminate()
-                self._backup_thread.wait(1000)
-            self._backup_thread.deleteLater()
-        if self._backup_worker:
-            self._backup_worker.deleteLater()
+        self._safely_stop_thread(self._backup_thread, self._backup_worker)
         self._backup_thread = None
         self._backup_worker = None
 
-        # Stop similar projects worker
-        if self._similar_worker:
-            self._similar_worker.cancel()
-            # Disconnect signals before cleanup
-            try:
-                self._similar_worker.finished.disconnect()
-                self._similar_worker.error.disconnect()
-            except (TypeError, RuntimeError):
-                pass  # Signals may already be disconnected
-        if self._similar_thread and self._similar_thread.isRunning():
-            self._similar_thread.quit()
-            if not self._similar_thread.wait(2000):  # Wait up to 2 seconds
-                self._similar_thread.terminate()
-                self._similar_thread.wait(1000)
-            self._similar_thread.deleteLater()
-        if self._similar_worker:
-            self._similar_worker.deleteLater()
+        self._safely_stop_thread(self._similar_thread, self._similar_worker)
         self._similar_thread = None
         self._similar_worker = None
 

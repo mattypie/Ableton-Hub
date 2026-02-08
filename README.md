@@ -4,7 +4,7 @@
 
 # Ableton Hub
 
-**Version 1.0.4**
+**Version 1.0.5**
 
 ## What is Ableton Hub?
 
@@ -552,6 +552,13 @@ Contributions are welcome! Please see the **[Contributing Guide](CONTRIBUTING.md
 ## 🔮 Roadmap
 - **[Feature Development Status](docs/FEATURE_DEVELOPMENT.md)** - What's implemented and what's planned
 - **[Planned Features Roadmap](docs/PLANNED_FEATURES.plan)** - Detailed implementation plans for future features
+
+### v1.0.5 - Performance & Stability
+- ✅ **Faster UI Navigation** - Navigating between views is near-instant; background workers properly cancelled when leaving views
+- ✅ **Persistent Metadata in DB** - Export filenames, annotations, master track names, and ML feature vectors stored during scanning (no redundant ALS parsing)
+- ✅ **Optimized Similarity Analysis** - Uses pre-computed feature vectors from the database instead of re-parsing ALS files on demand
+- ✅ **Thread Lifecycle Fixes** - Non-blocking thread cleanup with orphaned thread tracking prevents QThread crashes and UI freezes
+- ✅ **Bug Fixes** - Fixed NoneType comparison errors in similarity scoring, graceful dawtool tempo parse error handling, sidebar navigation cleanup
 
 ### Recently Completed
 - ✅ **Timeline Marker Extraction** - Extract timeline markers (locators) from projects using dawtool, display in Project Properties, and export to text/CSV

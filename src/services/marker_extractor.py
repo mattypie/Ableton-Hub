@@ -68,9 +68,15 @@ class MarkerExtractor:
             for marker in markers:
                 result.append({"time": float(marker.time), "text": str(marker.text)})
 
-            self.logger.debug(f"Extracted {len(result)} timeline markers from {als_path.name}")
+            if result:
+                self.logger.debug(f"Extracted {len(result)} timeline markers from {als_path.name}")
             return result
 
+        except ValueError as e:
+            # dawtool raises ValueError for known parse issues (e.g. "Cannot parse tempo")
+            # Log at warning level without traceback since these are expected for some projects
+            self.logger.warning(f"Could not extract markers from {als_path.name}: {e}")
+            return []
         except Exception as e:
             self.logger.error(
                 f"Error extracting timeline markers from {als_path}: {e}", exc_info=True

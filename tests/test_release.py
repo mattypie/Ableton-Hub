@@ -717,10 +717,9 @@ class ReleaseValidator:
             )
         
         try:
-            from src.services import SimilarityAnalyzer, MLFeatureExtractor
+            from src.services import SimilarityAnalyzer
             
-            extractor = MLFeatureExtractor()
-            analyzer = SimilarityAnalyzer(feature_extractor=extractor)
+            analyzer = SimilarityAnalyzer()
             
             # Create mock project dicts
             project_a = {

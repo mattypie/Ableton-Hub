@@ -13,6 +13,7 @@ from ..utils.fuzzy_match import match_export_to_project, normalize_for_compariso
 from ..utils.logging import get_logger
 from ..utils.paths import is_ableton_project, normalize_path
 from .als_parser import ALSParser
+from .ml_feature_extractor import MLFeatureExtractor
 
 # Audio file extensions for export detection
 AUDIO_EXTENSIONS = {".wav", ".mp3", ".flac", ".aiff", ".aif", ".ogg", ".m4a"}
@@ -41,6 +42,11 @@ class ScanWorker(QThread):
         self._found_count = 0
         self._parse_metadata = parse_metadata
         self._parser = ALSParser() if parse_metadata else None
+        self._feature_extractor = (
+            MLFeatureExtractor(extract_audio_features=False, use_extended_als=True)
+            if parse_metadata
+            else None
+        )
 
     def run(self) -> None:
         """Execute the scan."""
@@ -217,10 +223,16 @@ class ScanWorker(QThread):
 
             # Parse .als metadata if enabled
             if self._parse_metadata and self._parser:
+                self.logger.info(f"Parsing metadata for new project: {path.name}")
                 try:
                     metadata = self._parser.parse(path)
                     if metadata:
-                        self._apply_metadata_to_project(project, metadata)
+                        self._apply_metadata_to_project(project, metadata, als_path=path)
+                        self.logger.debug(
+                            f"Scan complete for {path.name}: tempo={metadata.tempo}, "
+                            f"tracks={metadata.track_count}, "
+                            f"plugins={len(metadata.plugins) if metadata.plugins else 0}"
+                        )
                 except Exception as e:
                     # Don't fail project creation if parsing fails
                     self.logger.warning(f"Failed to parse metadata for {path}: {e}")
@@ -257,24 +269,35 @@ class ScanWorker(QThread):
                         or datetime.fromtimestamp(stat.st_mtime) > project.last_parsed
                     )
                     if file_changed:
+                        self.logger.info(f"Parsing metadata for: {path.name}")
                         try:
                             metadata = self._parser.parse(path)
                             if metadata:
-                                self._apply_metadata_to_project(project, metadata)
+                                self._apply_metadata_to_project(project, metadata, als_path=path)
                                 session.commit()  # Commit metadata changes
+                                self.logger.debug(
+                                    f"Scan complete for {path.name}: tempo={metadata.tempo}, "
+                                    f"tracks={metadata.track_count}, "
+                                    f"plugins={len(metadata.plugins) if metadata.plugins else 0}"
+                                )
                         except Exception as e:
                             # Don't fail update if parsing fails
                             self.logger.warning(f"Failed to parse metadata for {path}: {e}")
+                    else:
+                        self.logger.debug(f"Skipping {path.name} - not modified since last parse")
 
         except Exception as e:
             self.logger.error(f"Error updating project {path}: {e}", exc_info=True)
 
-    def _apply_metadata_to_project(self, project: Project, metadata) -> None:
+    def _apply_metadata_to_project(
+        self, project: Project, metadata, als_path: Path | None = None
+    ) -> None:
         """Apply parsed metadata to a project object.
 
         Args:
             project: Project database object.
             metadata: ProjectMetadata object from parser.
+            als_path: Path to the .als file (for feature vector computation).
         """
         project.plugins = json.dumps(metadata.plugins) if metadata.plugins else "[]"
         project.devices = json.dumps(metadata.devices) if metadata.devices else "[]"
@@ -310,6 +333,21 @@ class ScanWorker(QThread):
         project.timeline_markers = (
             json.dumps(metadata.timeline_markers) if metadata.timeline_markers else "[]"
         )
+
+        # ALS project metadata (stored so views don't need to re-parse)
+        project.export_filenames = (
+            json.dumps(metadata.export_filenames) if metadata.export_filenames else None
+        )
+        project.annotation = metadata.annotation
+        project.master_track_name = metadata.master_track_name
+
+        # Compute and store ML feature vector for similarity analysis
+        if self._feature_extractor and als_path:
+            feature_vector = self._feature_extractor.compute_feature_vector_from_metadata(
+                metadata, als_path, project.id
+            )
+            if feature_vector:
+                project.feature_vector = json.dumps(feature_vector)
 
         # Note: export_song_name is NOT auto-populated during scanning.
         # Users can manually set it via the Properties view or use the "Suggest" button.

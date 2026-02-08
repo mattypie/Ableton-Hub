@@ -58,11 +58,12 @@ class SimilarProjectsWorker(BaseWorker):
                             "plugins": p.plugins or [],
                             "devices": p.devices or [],
                             "tempo": p.tempo,
-                            "track_count": p.track_count,
-                            "audio_tracks": getattr(p, "audio_tracks", 0),
-                            "midi_tracks": getattr(p, "midi_tracks", 0),
-                            "arrangement_length": p.arrangement_length,
+                            "track_count": p.track_count or 0,
+                            "audio_tracks": getattr(p, "audio_tracks", 0) or 0,
+                            "midi_tracks": getattr(p, "midi_tracks", 0) or 0,
+                            "arrangement_length": p.arrangement_length or 0,
                             "als_path": p.file_path,
+                            "feature_vector": p.get_feature_vector_list(),
                         }
                     )
 
@@ -74,6 +75,7 @@ class SimilarProjectsWorker(BaseWorker):
                     candidate_projects=candidate_dicts,
                     top_n=10,
                     min_similarity=0.3,
+                    cancel_check=self.is_cancelled,
                 )
 
                 if self.is_cancelled():

@@ -219,7 +219,7 @@ class LiveController(QObject):
             try:
                 from ..services.als_parser import ALSParser
 
-                parser = ALSParser()
+                parser = ALSParser(extract_markers=False)
                 metadata = parser.parse(Path(project_path))
                 if metadata and metadata.ableton_version:
                     # Extract major version from version string like "Ableton Live 11.3.10"

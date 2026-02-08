@@ -380,44 +380,38 @@ class ProjectDetailsDialog(QDialog):
                     subprocess.run(["xdg-open", str(path.parent)])
 
     def _load_als_export_history(self) -> None:
-        """Load export history from the ALS project file metadata."""
+        """Load export history from stored DB metadata."""
         if not self._project:
             return
 
-        try:
-            from ...services.als_parser import ALSParser
+        info_parts = []
 
-            parser = ALSParser()
-            metadata = parser.parse(Path(self._project.file_path))
+        # Export filenames (stored as JSON in DB)
+        export_filenames = self._project.export_filenames
+        if isinstance(export_filenames, str):
+            import json
 
-            if metadata:
-                info_parts = []
+            try:
+                export_filenames = json.loads(export_filenames)
+            except (json.JSONDecodeError, TypeError):
+                export_filenames = []
 
-                # Export filenames found in project
-                if metadata.export_filenames:
-                    info_parts.append(f"📁 Export names: {', '.join(metadata.export_filenames)}")
+        if export_filenames:
+            info_parts.append(f"📁 Export names: {', '.join(export_filenames)}")
 
-                # Annotation
-                if metadata.annotation:
-                    anno = metadata.annotation.strip()
-                    if len(anno) < 200:
-                        info_parts.append(f"📝 Annotation: {anno}")
+        if self._project.annotation:
+            anno = self._project.annotation.strip()
+            if len(anno) < 200:
+                info_parts.append(f"📝 Annotation: {anno}")
 
-                # Master track name
-                if metadata.master_track_name:
-                    info_parts.append(f"🎚️ Master track: {metadata.master_track_name}")
+        if self._project.master_track_name:
+            info_parts.append(f"🎚️ Master track: {self._project.master_track_name}")
 
-                if info_parts:
-                    self.als_exports_label.setText("\n".join(info_parts))
-                    self.als_exports_label.setStyleSheet(
-                        f"color: {AbletonTheme.COLORS['text_primary']};"
-                    )
-                else:
-                    self.als_exports_label.setText("No export history found in project file")
-            else:
-                self.als_exports_label.setText("Could not parse project file")
-        except Exception as e:
-            self.als_exports_label.setText(f"Error reading project: {str(e)[:50]}")
+        if info_parts:
+            self.als_exports_label.setText("\n".join(info_parts))
+            self.als_exports_label.setStyleSheet(f"color: {AbletonTheme.COLORS['text_primary']};")
+        else:
+            self.als_exports_label.setText("No export history found in project file")
 
     def _populate_export_name_suggestions(self) -> None:
         """Populate the export name completer with suggestions."""
@@ -460,32 +454,29 @@ class ProjectDetailsDialog(QDialog):
         suggestion = None
         source = "project name"
 
-        # Try to parse project metadata for export info
-        try:
-            from ...services.als_parser import ALSParser
+        # Use stored DB metadata instead of re-parsing ALS file
+        export_filenames = self._project.export_filenames
+        if isinstance(export_filenames, str):
+            import json
 
-            parser = ALSParser()
-            metadata = parser.parse(Path(self._project.file_path))
+            try:
+                export_filenames = json.loads(export_filenames)
+            except (json.JSONDecodeError, TypeError):
+                export_filenames = []
 
-            if metadata:
-                # Try export filenames from project (Live stores recent exports)
-                if metadata.export_filenames:
-                    suggestion = metadata.export_filenames[0]
-                    source = "project export history"
+        if export_filenames:
+            suggestion = export_filenames[0]
+            source = "project export history"
 
-                # Try annotation (might be song title)
-                if not suggestion and metadata.annotation:
-                    anno = metadata.annotation.strip()
-                    if len(anno) < 100 and "\n" not in anno:
-                        suggestion = anno
-                        source = "project annotation"
+        if not suggestion and self._project.annotation:
+            anno = self._project.annotation.strip()
+            if len(anno) < 100 and "\n" not in anno:
+                suggestion = anno
+                source = "project annotation"
 
-                # Try master track name
-                if not suggestion and metadata.master_track_name:
-                    suggestion = metadata.master_track_name
-                    source = "master track name"
-        except Exception:
-            pass  # Fall back to other methods
+        if not suggestion and self._project.master_track_name:
+            suggestion = self._project.master_track_name
+            source = "master track name"
 
         # Try linked exports
         if not suggestion and self._project.exports:
@@ -782,11 +773,16 @@ class ProjectDetailsDialog(QDialog):
                     "plugins": self._project.plugins or [],
                     "devices": self._project.devices or [],
                     "tempo": self._project.tempo,
-                    "track_count": self._project.track_count,
-                    "audio_tracks": getattr(self._project, "audio_tracks", 0),
-                    "midi_tracks": getattr(self._project, "midi_tracks", 0),
-                    "arrangement_length": self._project.arrangement_length,
+                    "track_count": self._project.track_count or 0,
+                    "audio_tracks": getattr(self._project, "audio_tracks", 0) or 0,
+                    "midi_tracks": getattr(self._project, "midi_tracks", 0) or 0,
+                    "arrangement_length": self._project.arrangement_length or 0,
                     "als_path": self._project.file_path,
+                    "feature_vector": (
+                        self._project.get_feature_vector_list()
+                        if hasattr(self._project, "get_feature_vector_list")
+                        else None
+                    ),
                 }
 
                 # Convert all projects to dict format
@@ -799,11 +795,16 @@ class ProjectDetailsDialog(QDialog):
                             "plugins": p.plugins or [],
                             "devices": p.devices or [],
                             "tempo": p.tempo,
-                            "track_count": p.track_count,
-                            "audio_tracks": getattr(p, "audio_tracks", 0),
-                            "midi_tracks": getattr(p, "midi_tracks", 0),
-                            "arrangement_length": p.arrangement_length,
+                            "track_count": p.track_count or 0,
+                            "audio_tracks": getattr(p, "audio_tracks", 0) or 0,
+                            "midi_tracks": getattr(p, "midi_tracks", 0) or 0,
+                            "arrangement_length": p.arrangement_length or 0,
                             "als_path": p.file_path,
+                            "feature_vector": (
+                                p.get_feature_vector_list()
+                                if hasattr(p, "get_feature_vector_list")
+                                else None
+                            ),
                         }
                     )
 

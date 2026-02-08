@@ -527,6 +527,41 @@ def migration_add_timeline_markers(engine: Engine) -> None:
             conn.commit()
 
 
+def migration_add_feature_vector(engine: Engine) -> None:
+    """Add feature_vector column to projects table.
+
+    Stores pre-computed ML feature vectors for similarity analysis.
+    Computed during project scanning so similarity comparisons don't
+    require re-parsing ALS files.
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text("PRAGMA table_info(projects)"))
+        columns = [row[1] for row in result.fetchall()]
+
+        if "feature_vector" not in columns:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN feature_vector TEXT"))
+            conn.commit()
+
+
+def migration_add_als_metadata_fields(engine: Engine) -> None:
+    """Add export_filenames, annotation, master_track_name columns to projects table.
+
+    These fields are extracted from .als files during scanning so that viewing
+    project properties does not require re-parsing the ALS file.
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text("PRAGMA table_info(projects)"))
+        columns = [row[1] for row in result.fetchall()]
+
+        if "export_filenames" not in columns:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN export_filenames TEXT"))
+        if "annotation" not in columns:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN annotation TEXT"))
+        if "master_track_name" not in columns:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN master_track_name VARCHAR(255)"))
+        conn.commit()
+
+
 # Migration registry - add new migrations here
 # Each migration is a tuple of (version, description, function)
 # NOTE: Must be defined AFTER the migration functions
@@ -579,6 +614,12 @@ MIGRATIONS: list[tuple] = [
     ),
     (15, "Update foreign key cascade behaviors (Phase 2)", migration_update_foreign_key_cascades),
     (16, "Add timeline_markers column to projects table", migration_add_timeline_markers),
+    (17, "Add feature_vector column to projects table", migration_add_feature_vector),
+    (
+        18,
+        "Add ALS metadata fields (export_filenames, annotation, master_track_name)",
+        migration_add_als_metadata_fields,
+    ),
 ]
 
 

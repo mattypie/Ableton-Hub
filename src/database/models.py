@@ -247,6 +247,14 @@ class Project(Base):
         JSON, default=list
     )  # List of timeline markers: [{"time": float, "text": str}]
 
+    # ML feature vector (computed during scan for similarity analysis)
+    feature_vector = Column(JSON, nullable=True)  # List of floats for cosine similarity
+
+    # ALS project metadata (extracted during scan to avoid re-parsing on view)
+    export_filenames = Column(JSON, nullable=True)  # Export filenames found in project file
+    annotation = Column(Text, nullable=True)  # Project annotation/notes from ALS
+    master_track_name = Column(String(255), nullable=True)  # Master track name
+
     # Relationships
     location = relationship("Location", back_populates="projects")
     project_collections = relationship(
@@ -333,6 +341,18 @@ class Project(Base):
         if isinstance(self.sample_references, str):
             return json.loads(self.sample_references) if self.sample_references else []
         return self.sample_references or []
+
+    def get_feature_vector_list(self) -> list[float] | None:
+        """Get feature vector as a Python list of floats.
+
+        Returns:
+            List of float values, or None if no feature vector is stored.
+        """
+        if self.feature_vector is None:
+            return None
+        if isinstance(self.feature_vector, str):
+            return json.loads(self.feature_vector) if self.feature_vector else None
+        return self.feature_vector
 
     def get_timeline_markers_list(self) -> list[dict[str, Any]]:
         """Get timeline markers as a Python list.

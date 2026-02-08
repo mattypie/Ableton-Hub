@@ -163,7 +163,7 @@ class MLFeatureExtractor:
             normalize_features: Whether to normalize the combined feature vector.
         """
         self.logger = get_logger(__name__)
-        self._als_parser = ALSParser(extract_extended=use_extended_als)
+        self._als_parser = ALSParser(extract_extended=use_extended_als, extract_markers=False)
         self._asd_parser = ASDParser()
         self._extract_audio_requested = extract_audio_features
         self._normalize_requested = normalize_features
@@ -239,6 +239,45 @@ class MLFeatureExtractor:
         self._feature_cache[cache_key] = result
 
         return result
+
+    def compute_feature_vector_from_metadata(
+        self, metadata: Any, als_path: Path, project_id: int | None = None
+    ) -> list[float] | None:
+        """Compute a feature vector from already-parsed ALS metadata.
+
+        This avoids re-parsing the ALS file when metadata has already been
+        extracted (e.g., during scanning). The result is a plain list of floats
+        suitable for JSON storage in the database.
+
+        Args:
+            metadata: ProjectMetadata object from ALSParser.parse().
+            als_path: Path to the .als file (used for ASD file discovery).
+            project_id: Optional database ID for the project.
+
+        Returns:
+            List of floats representing the combined feature vector,
+            or None if computation fails.
+        """
+        try:
+            result = ProjectFeatureVector(project_id=project_id, project_path=str(als_path))
+
+            # Generate ALS features from the already-parsed metadata
+            result.als_features = self._als_parser.generate_feature_vector(metadata)
+
+            # Extract ASD features from the project directory
+            project_dir = als_path.parent
+            asd_files = find_asd_files(project_dir)
+            if asd_files:
+                result.asd_features = self._extract_aggregated_asd_features(asd_files)
+
+            # Combine into a single vector
+            result.combined_vector = self._combine_features(result)
+
+            return result.combined_vector.tolist() if result.combined_vector is not None else None
+
+        except Exception as e:
+            self.logger.warning(f"Failed to compute feature vector for {als_path.name}: {e}")
+            return None
 
     def _extract_aggregated_asd_features(self, asd_files: list[Path]) -> list[float]:
         """Extract and aggregate features from multiple ASD files.

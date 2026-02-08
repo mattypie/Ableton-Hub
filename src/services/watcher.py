@@ -445,6 +445,13 @@ class FileWatcher(QObject):
             json.dumps(metadata.timeline_markers) if metadata.timeline_markers else "[]"
         )
 
+        # ALS project metadata
+        project.export_filenames = (
+            json.dumps(metadata.export_filenames) if metadata.export_filenames else None
+        )
+        project.annotation = metadata.annotation
+        project.master_track_name = metadata.master_track_name
+
         # Note: export_song_name is NOT auto-populated during file watching.
         # Users can manually set it via the Properties view or use the "Suggest" button.
 
